@@ -49,6 +49,17 @@ class ReleaseConfig:
             "filter": {
                 "ignore_messages": ["^docs:.*", "^chore:.*", "^style:.*", ".*WIP.*", ".*merge.*", "^Revert.*"],
                 "keep_types": ["feat", "fix", "perf", "refactor", "security"],
+                "emoji_map": {
+                    "✨": "feat",
+                    "🐛": "fix",
+                    "🛡️": "security",
+                    "⚡️": "perf",
+                    "♻️": "refactor",
+                    "🔧": "chore",
+                    "💄": "style",
+                    "✅": "test",
+                    "📝": "docs",
+                },
             },
             "release": {
                 "steps": ["preflight", "prepare", "commit", "pr"],
@@ -124,6 +135,19 @@ class ReleaseConfig:
         return self._config.get("filter", {})
 
     @property
+    def changelog_root_dir(self) -> Path:
+        """changelog 根目录，用于解析 output_dir 等相对路径
+
+        优先读取 changelog.root_dir 配置项；
+        未配置时回退到 packager_root_dir 以保持向后兼容。
+        """
+        root_dir = self._config.get("changelog", {}).get("root_dir")
+        if root_dir is not None:
+            return self._resolve_path(str(root_dir))
+        # 向后兼容：未配置 changelog.root_dir 时回退到 packager_root_dir
+        return self.packager_root_dir
+
+    @property
     def changelog_output_dir(self) -> Path:
         """changelog 输出目录"""
         output_dir = self._config.get("changelog", {}).get("output_dir", "docs/changes")
@@ -131,7 +155,7 @@ class ReleaseConfig:
         if output_path.is_absolute():
             return output_path
 
-        return (self.packager_root_dir / output_path).resolve()
+        return (self.changelog_root_dir / output_path).resolve()
 
     @property
     def ignore_messages(self) -> list[str]:
@@ -142,6 +166,11 @@ class ReleaseConfig:
     def keep_types(self) -> list[str]:
         """保留的提交类型"""
         return self.filter_config.get("keep_types", ["feat", "fix", "perf", "refactor", "security"])
+
+    @property
+    def emoji_map(self) -> dict[str, str]:
+        """Emoji 到提交类型的映射"""
+        return self.filter_config.get("emoji_map", {})
 
     @property
     def release_config(self) -> dict[str, Any]:
