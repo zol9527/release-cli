@@ -153,7 +153,7 @@ class VersionManager:
             return self._get_from_git_tag()
         elif source == "script":
             raise ValueError(
-                "检测到旧配置 source=script。请改成 source=file 或 source=git-tag，并保留 hook: scripts/release-version-hook.py。"
+                "检测到旧配置 source=script。请改成 source=file 或 source=git-tag，并保留 hook: .release/_shared/hooks/hook-version.py。"
             )
         else:
             raise ValueError(f"不支持的版本来源: {source}，仅支持 file 或 git-tag")
@@ -241,7 +241,7 @@ class VersionManager:
         try:
             if source == "script":
                 raise ValueError(
-                    "检测到旧配置 source=script。请改成 source=file 或 source=git-tag，并保留 hook: scripts/release-version-hook.py。"
+                    "检测到旧配置 source=script。请改成 source=file 或 source=git-tag，并保留 hook: .release/_shared/hooks/hook-version.py。"
                 )
             if source not in {"file", "git-tag"}:
                 raise ValueError(f"不支持的版本来源: {source}，仅支持 file 或 git-tag")

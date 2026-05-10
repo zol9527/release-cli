@@ -66,7 +66,7 @@ def test_release_flow_rejects_unknown_step(tmp_path: Path) -> None:
 
 def test_release_flow_can_run_custom_python_workflow(tmp_path: Path) -> None:
     _init_git_repo(tmp_path)
-    workflow_path = tmp_path / "scripts" / "release" / "workflows" / "release.py"
+    workflow_path = tmp_path / ".release" / "_shared" / "hooks" / "hook-release.py"
     workflow_path.parent.mkdir(parents=True)
     workflow_path.write_text(
         "def step(func):\n"
@@ -89,7 +89,7 @@ def test_release_flow_can_run_custom_python_workflow(tmp_path: Path) -> None:
         "  file: VERSION\n"
         "workflow:\n"
         "  release:\n"
-        "    script: scripts/release/workflows/release.py\n"
+        "    script: .release/_shared/hooks/hook-release.py\n"
         "packager:\n"
         "  root_dir: .\n",
         encoding="utf-8",
@@ -113,12 +113,12 @@ def test_init_monorepo_generates_unit_configs_and_shared_workflow(tmp_path: Path
     assert result.exit_code == 0
     assert (tmp_path / ".release" / "backend.yml").exists()
     assert (tmp_path / ".release" / "wechat.yml").exists()
-    assert (tmp_path / ".release" / "_shared" / "version-hook.py").exists()
-    assert (tmp_path / ".release" / "_shared" / "workflows" / "release.py").exists()
+    assert (tmp_path / ".release" / "_shared" / "hooks" / "hook-version.py").exists()
+    assert (tmp_path / ".release" / "_shared" / "hooks" / "hook-release.py").exists()
     assert (tmp_path / ".release" / "_state" / "backend.VERSION").exists()
     assert (tmp_path / ".release" / "_state" / "wechat.VERSION").exists()
     assert 'tag_prefix: "backend/v"' in (tmp_path / ".release" / "backend.yml").read_text(encoding="utf-8")
-    assert "release_cli.workflow" not in (tmp_path / ".release" / "_shared" / "workflows" / "release.py").read_text(encoding="utf-8")
+    assert "release_cli.workflow" not in (tmp_path / ".release" / "_shared" / "hooks" / "hook-release.py").read_text(encoding="utf-8")
 
 
 def test_init_single_project_generates_everything_under_release_dir(tmp_path: Path, monkeypatch) -> None:
@@ -129,8 +129,8 @@ def test_init_single_project_generates_everything_under_release_dir(tmp_path: Pa
     assert result.exit_code == 0
     assert (tmp_path / ".release" / "release.yml").exists()
     assert (tmp_path / ".release" / "_state" / "VERSION").exists()
-    assert (tmp_path / ".release" / "_shared" / "version-hook.py").exists()
-    assert (tmp_path / ".release" / "_shared" / "workflows" / "release.py").exists()
+    assert (tmp_path / ".release" / "_shared" / "hooks" / "hook-version.py").exists()
+    assert (tmp_path / ".release" / "_shared" / "hooks" / "hook-release.py").exists()
     assert not (tmp_path / ".release.yml").exists()
     assert not (tmp_path / "VERSION").exists()
     assert not (tmp_path / "scripts" / "release-version-hook.py").exists()

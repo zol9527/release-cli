@@ -46,7 +46,7 @@ version:
 ```yaml
 version:
   source: file
-  hook: scripts/release-version-hook.py
+  hook: .release/_shared/hooks/hook-version.py
 ```
 
 这里要注意：
@@ -59,10 +59,10 @@ version:
 
 ```bash
 # release-cli 会把 payload.json 路径作为唯一参数传进来
-python scripts/release-version-hook.py /tmp/release-hook-payload.json
+python .release/_shared/hooks/hook-version.py /tmp/release-hook-payload.json
 ```
 
-`release-cli init` 会生成一个可直接修改的 `scripts/release-version-hook.py` 示例。你只需要在 `apply_version_update(context)` 里补自己的项目逻辑，不需要自己处理命令行输入输出。
+`release-cli init` 会生成一个可直接修改的 `.release/_shared/hooks/hook-version.py` 示例。你只需要在对应同步阶段里补自己的项目逻辑，不需要自己处理命令行输入输出。
 默认模板会先同步 `VERSION` 文件，这样无论最终是否要打 tag，发布文件都会先落盘。
 
 ## Changelog 与过滤规则

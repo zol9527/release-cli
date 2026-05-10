@@ -54,7 +54,7 @@ version:
   source: file
   tag_prefix: "v"
   file: _state/VERSION
-  hook: _shared/version-hook.py
+  hook: _shared/hooks/hook-version.py
 
 changelog:
   output_dir: docs/changes
@@ -101,10 +101,10 @@ release:
 
 workflow:
   release:
-    script: _shared/workflows/release.py
+    script: _shared/hooks/hook-release.py
 ```
 
-如果你希望版本写入后顺手修改 `package.json`、`manifest.json` 等文件，直接编辑 `release-cli init` 生成的 `.release/_shared/version-hook.py` 即可。这个 hook 在 `source: file` 和 `source: git-tag` 下都可以使用，版本来源仍然只由 `version.source` 决定。
+如果你希望版本写入后顺手修改 `package.json`、`manifest.json` 等文件，直接编辑 `release-cli init` 生成的 `.release/_shared/hooks/hook-version.py` 即可。这个 hook 在 `source: file` 和 `source: git-tag` 下都可以使用，版本来源仍然只由 `version.source` 决定。
 
 Monorepo 项目可以通过 `version.tag_prefix` 为不同发布单元隔离 Git tag。例如后端使用 `backend/v`，小程序使用 `wechat/v`，同一个仓库里就会生成 `backend/v1.2.3` 和 `wechat/v1.0.1` 两条互不影响的发布线。
 
@@ -113,14 +113,14 @@ Monorepo 项目可以通过 `version.tag_prefix` 为不同发布单元隔离 Git
 ```yaml
 version:
   source: file   # 或 git-tag
-  hook: .release/_shared/version-hook.py
+  hook: .release/_shared/hooks/hook-version.py
 ```
 
 Hook 约定如下：
 
 ```bash
 # release-cli 会把 payload.json 路径作为唯一参数传进去
-python .release/_shared/version-hook.py /tmp/release-hook-payload.json
+python .release/_shared/hooks/hook-version.py /tmp/release-hook-payload.json
 ```
 
 这个 payload 里会包含：

@@ -146,7 +146,7 @@ version:
   source: git-tag
   tag_prefix: "{unit}/v"
   file: _state/{unit}.VERSION
-  hook: _shared/version-hook.py
+  hook: _shared/hooks/hook-version.py
 
 changelog:
   root_dir: ../apps/{unit}
@@ -180,7 +180,7 @@ release:
   base_branch: release
 workflow:
   release:
-    script: _shared/workflows/release.py
+    script: _shared/hooks/hook-release.py
 
 packager:
   root_dir: ../apps/{unit}
@@ -849,8 +849,8 @@ def init(
         generated_targets = [release_dir / f"{unit}.yml" for unit in unit_names]
         generated_targets.extend(
             [
-                shared_dir / "version-hook.py",
-                shared_dir / "workflows" / "release.py",
+                shared_dir / "hooks" / "hook-version.py",
+                shared_dir / "hooks" / "hook-release.py",
                 *(release_dir / "_state" / f"{unit}.VERSION" for unit in unit_names),
             ]
         )
@@ -872,16 +872,16 @@ def init(
             version_target.write_text("v0.1.0\n", encoding="utf-8")
             typer.echo(f"✅ 已生成发布单元版本文件: {version_target}")
 
-        hook_template = template_dir / "version_hook.py"
+        hook_template = template_dir / "hooks" / "hook-version.py"
         if hook_template.exists():
-            hook_target = shared_dir / "version-hook.py"
+            hook_target = shared_dir / "hooks" / "hook-version.py"
             hook_target.parent.mkdir(parents=True, exist_ok=True)
             hook_target.write_text(hook_template.read_text(encoding="utf-8"), encoding="utf-8")
             typer.echo(f"✅ 已生成共享版本 Hook: {hook_target}")
 
-        workflow_template = template_dir / "workflows" / "release.py"
+        workflow_template = template_dir / "hooks" / "hook-release.py"
         if workflow_template.exists():
-            workflow_target = shared_dir / "workflows" / "release.py"
+            workflow_target = shared_dir / "hooks" / "hook-release.py"
             workflow_target.parent.mkdir(parents=True, exist_ok=True)
             workflow_target.write_text(workflow_template.read_text(encoding="utf-8"), encoding="utf-8")
             typer.echo(f"✅ 已生成共享 Release Workflow: {workflow_target}")
@@ -891,8 +891,8 @@ def init(
     shared_dir = release_dir / "_shared"
     config_file = release_dir / "release.yml"
     version_file = release_dir / "_state" / "VERSION"
-    hook_file = shared_dir / "version-hook.py"
-    workflow_file = shared_dir / "workflows" / "release.py"
+    hook_file = shared_dir / "hooks" / "hook-version.py"
+    workflow_file = shared_dir / "hooks" / "hook-release.py"
     github_dir = Path(".github/workflows")
     github_template_dir = template_dir / "github"
 
@@ -922,13 +922,13 @@ def init(
         version_file.write_text("v0.1.0\n", encoding="utf-8")
     typer.echo(f"✅ 已生成版本文件: {version_file}")
 
-    hook_template = template_dir / "version_hook.py"
+    hook_template = template_dir / "hooks" / "hook-version.py"
     if hook_template.exists():
         hook_file.parent.mkdir(parents=True, exist_ok=True)
         hook_file.write_text(hook_template.read_text(encoding="utf-8"), encoding="utf-8")
         typer.echo(f"✅ 已生成版本 Hook 示例: {hook_file}")
 
-    workflow_template = template_dir / "workflows" / "release.py"
+    workflow_template = template_dir / "hooks" / "hook-release.py"
     if workflow_template.exists():
         workflow_file.parent.mkdir(parents=True, exist_ok=True)
         workflow_file.write_text(workflow_template.read_text(encoding="utf-8"), encoding="utf-8")

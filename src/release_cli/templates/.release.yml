@@ -22,7 +22,7 @@ version:
   # 写入版本后执行的 Hook 脚本
   # release-cli 会把一个 payload.json 的路径作为唯一参数传给它
   # 你只需要在 Hook 模板里的 apply_version_update(context) 中补自己的业务逻辑
-  hook: _shared/version-hook.py
+  hook: _shared/hooks/hook-version.py
 
 # -----------------------------------------------------------------------------
 # 变更日志配置
@@ -110,7 +110,7 @@ workflow:
   release:
     # 如果启用这个脚本，release-cli release 会执行其中的 @step 函数。
     # 每个 @step 内可以调用 ctx.builtin() 复用内置逻辑，也可以写定制逻辑。
-    script: _shared/workflows/release.py
+    script: _shared/hooks/hook-release.py
 
 # -----------------------------------------------------------------------------
 # 打包配置
