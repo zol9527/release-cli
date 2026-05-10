@@ -119,3 +119,94 @@ def test_resolve_pack_version_rejects_version_keyword(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="明确版本号"):
         _resolve_pack_version(ReleaseConfig(config_file))
+
+
+# ---------------------------------------------------------------------------
+# changelog.root_dir 独立解析测试
+# ---------------------------------------------------------------------------
+
+
+def test_changelog_root_dir_resolves_independently_from_packager(tmp_path: Path) -> None:
+    """changelog.root_dir 可以独立于 packager.root_dir 指定"""
+    # 目录结构: project/.release/release.yml，项目根是 project/
+    release_dir = tmp_path / ".release"
+    release_dir.mkdir()
+    config_file = release_dir / "release.yml"
+
+    # changelog 输出到项目根下的 docs/changes
+    changes_dir = tmp_path / "docs" / "changes"
+    changes_dir.mkdir(parents=True)
+
+    config_file.write_text(
+        "changelog:\n"
+        "  root_dir: ..\n"
+        "  output_dir: docs/changes\n"
+        "packager:\n"
+        "  root_dir: ..\n",
+        encoding="utf-8",
+    )
+
+    changelog = changes_dir / "2026-03-11-v2.0.0.md"
+    changelog.write_text("---\nversion: \"2.0.0\"\n---\n", encoding="utf-8")
+
+    version, changelog_path = _resolve_pack_version(ReleaseConfig(config_file))
+
+    assert version == "2.0.0"
+    assert changelog_path == changelog.resolve()
+
+
+def test_changelog_root_dir_differs_from_packager_root_dir(tmp_path: Path) -> None:
+    """changelog.root_dir 可以与 packager.root_dir 不同"""
+    # 模拟配置文件在 project/.release/release.yml
+    release_dir = tmp_path / ".release"
+    release_dir.mkdir()
+    config_file = release_dir / "release.yml"
+
+    # changelog 输出到项目根的 changelog-output/ 目录（与 packager.root_dir 不同）
+    custom_output = tmp_path / "changelog-output"
+    custom_output.mkdir(parents=True)
+
+    config_file.write_text(
+        "changelog:\n"
+        "  root_dir: ..\n"
+        "  output_dir: changelog-output\n"
+        "packager:\n"
+        "  root_dir: ..\n",
+        encoding="utf-8",
+    )
+
+    changelog = custom_output / "2026-03-11-v1.0.0.md"
+    changelog.write_text("---\nversion: \"1.0.0\"\n---\n", encoding="utf-8")
+
+    version, changelog_path = _resolve_pack_version(ReleaseConfig(config_file))
+
+    assert version == "1.0.0"
+    assert changelog_path == changelog.resolve()
+
+
+def test_changelog_output_dir_falls_back_to_packager_root_dir(tmp_path: Path) -> None:
+    """未配置 changelog.root_dir 时回退到 packager.root_dir（向后兼容）"""
+    config_file = tmp_path / ".release.yml"
+    changes_dir = tmp_path / "docs" / "changes"
+    changes_dir.mkdir(parents=True)
+
+    # 不配置 changelog.root_dir，只有 packager.root_dir
+    config_file.write_text(
+        "changelog:\n"
+        "  output_dir: docs/changes\n"
+        "packager:\n"
+        "  root_dir: .\n",
+        encoding="utf-8",
+    )
+
+    changelog = changes_dir / "2026-03-11-v1.0.0.md"
+    changelog.write_text("---\nversion: \"1.0.0\"\n---\n", encoding="utf-8")
+
+    config = ReleaseConfig(config_file)
+    # 向后兼容：changelog_root_dir 回退到 packager_root_dir
+    assert config.changelog_root_dir == config.packager_root_dir
+
+    version, changelog_path = _resolve_pack_version(config)
+
+    assert version == "1.0.0"
+    assert changelog_path == changelog.resolve()

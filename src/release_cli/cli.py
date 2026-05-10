@@ -142,6 +142,7 @@ version:
   hook: _shared/version-hook.py
 
 changelog:
+  root_dir: ../apps/{unit}
   output_dir: docs/changes
 
 filter:
