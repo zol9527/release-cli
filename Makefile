@@ -29,7 +29,7 @@ build: ## 构建分发包
 # 构建并输出包（发布由 GitHub Actions 通过 GitHub Release 完成）
 publish: build ## 构建包（正式发布请推送 tag 触发 GitHub Actions）
 	@echo "✅ 包已构建完成，请推送 tag 触发 GitHub Actions 自动发布到 GitHub Release："
-	@echo "   git tag v\$$(poetry version -s) && git push origin main --tags"
+	@echo "   git tag v\$$(poetry version -s) && git push origin dev --tags"
 	@echo "📦 https://github.com/$(GITHUB_OWNER)/release-cli/releases"
 
 # 通用发布函数
@@ -44,7 +44,7 @@ _release:
 	echo "✅ 准备完成！"; \
 	echo ""; \
 	echo "下一步："; \
-	echo "  git push origin main --tags"; \
+	echo "  git push origin dev --tags"; \
 	echo ""; \
 	echo "或在 GitHub 创建 Release:"; \
 	echo "  https://github.com/zol9527/release-cli/releases/new"
@@ -72,7 +72,7 @@ release: ## 完整发布流程（版本+提交+tag+推送）
 	git add pyproject.toml poetry.lock; \
 	git commit -m "🚀 release: v$$NEW_VERSION"; \
 	git tag v$$NEW_VERSION; \
-	git push origin main --tags; \
+	git push origin dev --tags; \
 	echo "✅ 发布流程完成！"; \
 	echo "📦 等待 GitHub Actions 构建..."; \
 	echo "🔗 https://github.com/zol9527/release-cli/actions"
