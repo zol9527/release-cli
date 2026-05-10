@@ -8,8 +8,8 @@
     只同步 release-cli 自己的版本状态文件，不假设任何业务技术栈。
 
 如何扩展:
-    在下面的 `sync_package_json()`、`sync_custom_files()` 等函数中补充你的
-    项目逻辑。模板不会默认修改 package.json、构建元数据或其他业务文件。
+    在下面的 `sync_project_files()` 函数中补充你的项目逻辑。
+    模板不会默认修改 package.json、构建元数据或其他业务文件。
 """
 
 from __future__ import annotations
@@ -32,7 +32,6 @@ class HookContext:
     version_file: Path | None
     git_tag: str
 
-
 def load_context(payload_path: Path) -> HookContext:
     """从 release-cli 生成的 payload.json 读取上下文。"""
     payload = json.loads(payload_path.read_text(encoding="utf-8"))
@@ -46,12 +45,10 @@ def load_context(payload_path: Path) -> HookContext:
         git_tag=payload.get("git_tag", ""),
     )
 
-
 def write_text(file_path: Path, content: str) -> None:
     """写入纯文本文件，并确保父目录存在。"""
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
-
 
 def write_json_version(file_path: Path, version: str, key: str = "version") -> None:
     """把 JSON 文件中的版本字段更新为指定版本。"""
@@ -59,11 +56,20 @@ def write_json_version(file_path: Path, version: str, key: str = "version") -> N
     data[key] = version
     file_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+def release_unit(ctx: HookContext) -> str:
+    """返回当前发布单元名称。
+
+    在 monorepo 中，通常会通过 `.release/backend.yml`、`.release/wechat.yml`
+    这样的配置文件调用同一个 hook。这个函数会从配置文件名推导出
+    `backend`、`wechat` 等发布单元名称，方便你在一个共享 hook 中分支处理。
+    """
+    if ctx.config_file is None:
+        return "release"
+    return ctx.config_file.stem
 
 # -----------------------------------------------------------------------------
 # 生命周期 hook
 # -----------------------------------------------------------------------------
-
 
 def before_all(ctx: HookContext) -> None:
     """全部版本同步开始前。
@@ -71,7 +77,6 @@ def before_all(ctx: HookContext) -> None:
     适合放置轻量校验，例如确认项目根目录、检查必需文件是否存在。
     """
     pass
-
 
 def sync_version_file(ctx: HookContext) -> None:
     """同步 release-cli 自己的版本状态文件。
@@ -84,31 +89,42 @@ def sync_version_file(ctx: HookContext) -> None:
     write_text(ctx.version_file, f"v{ctx.version}\n")
     print(f"✅ 已同步 VERSION: {ctx.version_file}")
 
+def sync_project_files(ctx: HookContext) -> None:
+    """按需同步当前发布单元的项目文件。
 
-def sync_package_json(ctx: HookContext) -> None:
-    """按需同步 package.json。
-
-    默认不启用，避免假设项目一定是 Node/Bun/npm 项目。
-    如果需要，取消下面示例代码的注释即可。
-    """
-    # package_json = ctx.project_root / "package.json"
-    # if not package_json.exists():
-    #     return
-    # write_json_version(package_json, ctx.version)
-    # print(f"✅ 已同步 package.json: {package_json}")
-    pass
-
-
-def sync_custom_files(ctx: HookContext) -> None:
-    """按需同步项目自己的版本文件。
-
-    你可以在这里补充任何项目专属逻辑，例如:
+    这是业务逻辑的主要扩展入口。模板默认不做任何业务文件修改，
+    你拿到后可以直接在这里补充逻辑，例如:
+    - 同步当前 workspace 的 package.json
     - 写入前端展示用 version.ts
     - 同步后端 build metadata
     - 生成 release info JSON
     - 更新其他 workspace 内部的版本声明文件
+
+    如果多个 workspace 共用这个 hook，可以用 `release_unit(ctx)` 判断当前
+    发布单元，然后分别处理:
+
+        unit = release_unit(ctx)
+        if unit == "backend":
+            ...
+        elif unit == "wechat":
+            ...
     """
-    # 示例：写入一个自定义 JSON 文件
+    # 示例 1：同步当前发布单元根目录下的 package.json
+    # package_json = ctx.project_root / "package.json"
+    # if package_json.exists():
+    #     write_json_version(package_json, ctx.version)
+    #     print(f"✅ 已同步 package.json: {package_json}")
+
+    # 示例 2：根据发布单元分支处理
+    # unit = release_unit(ctx)
+    # if unit == "backend":
+    #     metadata = ctx.project_root / "release-info.json"
+    #     metadata.write_text(
+    #         json.dumps({"version": ctx.version, "tag": ctx.git_tag}, ensure_ascii=False, indent=2) + "\n",
+    #         encoding="utf-8",
+    #     )
+
+    # 示例 3：写入一个自定义 JSON 文件
     # release_info = ctx.project_root / "release-info.json"
     # release_info.write_text(
     #     json.dumps({"version": ctx.version, "tag": ctx.git_tag}, ensure_ascii=False, indent=2) + "\n",
@@ -116,29 +132,24 @@ def sync_custom_files(ctx: HookContext) -> None:
     # )
     pass
 
-
 def after_all(ctx: HookContext) -> None:
     """全部版本同步完成后，成功和失败都会执行。"""
     pass
-
 
 def on_success(ctx: HookContext) -> None:
     """版本同步成功后执行。"""
     pass
 
-
 def on_failure(ctx: HookContext) -> None:
     """版本同步失败后执行。"""
     pass
-
 
 def run(ctx: HookContext) -> None:
     """按固定顺序执行 version hook。"""
     before_all(ctx)
     try:
         sync_version_file(ctx)
-        sync_package_json(ctx)
-        sync_custom_files(ctx)
+        sync_project_files(ctx)
     except Exception:
         after_all(ctx)
         on_failure(ctx)
@@ -146,7 +157,6 @@ def run(ctx: HookContext) -> None:
     else:
         after_all(ctx)
         on_success(ctx)
-
 
 def main() -> None:
     """读取 payload 并执行 version hook。"""
@@ -157,7 +167,6 @@ def main() -> None:
     context = load_context(payload_path)
     run(context)
     print(f"hook-version completed for {context.git_tag or context.version}")
-
 
 if __name__ == "__main__":
     main()
