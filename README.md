@@ -8,11 +8,11 @@
 # 方式一：pip 安装
 pip install release-cli
 
-# 方式二：使用 Poetry 开发安装
+# 方式二：使用 uv 开发安装
 git clone https://github.com/zol9527/release-cli.git
 cd release-cli
-poetry install
-poetry run release-cli --help
+uv sync --group dev
+uv run release-cli --help
 ```
 
 ## 快速开始

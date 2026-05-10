@@ -16,29 +16,29 @@ help: ## 显示帮助信息
 # 安装依赖
 install: ## 安装项目依赖
 	@echo "📦 安装依赖..."
-	poetry install
+	uv sync --group dev
 	@echo "✅ 安装完成！"
 
 # 构建
 build: ## 构建分发包
 	@echo "🔨 构建包..."
-	poetry build
+	uv build
 	@echo "✅ 构建完成！"
 	@ls -lh dist/
 
 # 构建并输出包（发布由 GitHub Actions 通过 GitHub Release 完成）
 publish: build ## 构建包（正式发布请推送 tag 触发 GitHub Actions）
 	@echo "✅ 包已构建完成，请推送 tag 触发 GitHub Actions 自动发布到 GitHub Release："
-	@echo "   git tag v\$$(poetry version -s) && git push origin dev --tags"
+	@echo "   git tag v\$$(uv version --short) && git push origin dev --tags"
 	@echo "📦 https://github.com/$(GITHUB_OWNER)/release-cli/releases"
 
 # 通用发布函数
 _release:
 	@echo "🚀 发布新版本 ($(VERSION_TYPE))..."
-	@poetry version $(VERSION_TYPE)
-	@NEW_VERSION=$$(poetry version -s); \
+	@uv version --bump $(VERSION_TYPE)
+	@NEW_VERSION=$$(uv version --short); \
 	echo "📌 版本: v$$NEW_VERSION"; \
-	git add pyproject.toml poetry.lock; \
+	git add pyproject.toml uv.lock; \
 	git commit -m "🚀 release: v$$NEW_VERSION"; \
 	git tag v$$NEW_VERSION; \
 	echo "✅ 准备完成！"; \
@@ -66,10 +66,10 @@ release: ## 完整发布流程（版本+提交+tag+推送）
 	@echo "🚀 开始完整发布流程..."
 	@VERSION_TYPE=$$(git log -1 --pretty=%s | grep -q "feat\|feature" && echo "minor" || echo "patch"); \
 	echo "检测到版本类型: $$VERSION_TYPE"; \
-	poetry version $$VERSION_TYPE; \
-	NEW_VERSION=$$(poetry version -s); \
+	uv version --bump $$VERSION_TYPE; \
+	NEW_VERSION=$$(uv version --short); \
 	echo "📌 版本: v$$NEW_VERSION"; \
-	git add pyproject.toml poetry.lock; \
+	git add pyproject.toml uv.lock; \
 	git commit -m "🚀 release: v$$NEW_VERSION"; \
 	git tag v$$NEW_VERSION; \
 	git push origin dev --tags; \
@@ -89,34 +89,34 @@ clean: ## 清理构建文件
 # 测试
 test: ## 运行测试
 	@echo "🧪 运行测试..."
-	poetry run pytest -v
+	uv run pytest -v
 
 # Lint 检查
 lint: ## 运行代码检查
 	@echo "🔍 运行代码检查..."
-	poetry run ruff check .
-	poetry run ruff format --check .
+	uv run ruff check .
+	uv run ruff format --check .
 	@echo "✅ 检查通过！"
 
 # 类型检查
 typecheck: ## 运行类型检查
 	@echo "🔍 运行类型检查..."
-	poetry run mypy src/
+	uv run mypy src/
 	@echo "✅ 类型检查通过！"
 
 # 开发设置
 dev-setup: ## 开发环境设置
 	@echo "🔧 设置开发环境..."
-	poetry install
-	poetry run pre-commit install 2>/dev/null || echo "pre-commit 未安装，跳过"
+	uv sync --group dev
+	uv run pre-commit install 2>/dev/null || echo "pre-commit 未安装，跳过"
 	@echo "✅ 开发环境设置完成！"
 
 # 查看当前版本
 version: ## 查看当前版本
-	@poetry version -s
+	@uv version --short
 
 # 更新依赖
 update: ## 更新依赖到最新版本
 	@echo "⬆️ 更新依赖..."
-	poetry update
+	uv sync --upgrade --group dev
 	@echo "✅ 依赖更新完成！"

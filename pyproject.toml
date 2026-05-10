@@ -24,7 +24,10 @@ Repository = "https://github.com/zol9527/release-cli"
 Documentation = "https://github.com/zol9527/release-cli#readme"
 Issues = "https://github.com/zol9527/release-cli/issues"
 
-[project.optional-dependencies]
+[project.scripts]
+release-cli = "release_cli.cli:app"
+
+[dependency-groups]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -32,26 +35,19 @@ dev = [
     "mypy>=1.0",
 ]
 
-[project.scripts]
-release-cli = "release_cli.cli:app"
+[tool.hatch.build.targets.wheel]
+packages = ["src/release_cli"]
 
-[tool.poetry]
-packages = [
-    { include = "release_cli", from = "src" },
-]
+[tool.hatch.build.targets.sdist]
 include = [
-    { path = "src/release_cli/templates/**/*", format = ["sdist", "wheel"] },
+    "/README.md",
+    "/pyproject.toml",
+    "/src/release_cli",
 ]
-
-[tool.poetry.group.dev.dependencies]
-pytest = ">=7.0"
-pytest-cov = ">=4.0"
-ruff = ">=0.1.0"
-mypy = ">=1.0"
 
 [build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 100

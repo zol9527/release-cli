@@ -8,14 +8,14 @@
 
 ```bash
 # 1. 更新版本号
-poetry version patch  # 或 minor / major
+uv version --bump patch  # 或 minor / major
 
 # 2. 提交更改
-git add pyproject.toml poetry.lock
-git commit -m "⬆️ bump version to $(poetry version -s)"
+git add pyproject.toml uv.lock
+git commit -m "⬆️ bump version to $(uv version --short)"
 
 # 3. 创建 tag
-git tag v$(poetry version -s)
+git tag v$(uv version --short)
 
 # 4. 推送
 git push origin main --tags
@@ -32,15 +32,15 @@ git push origin main --tags
 
 ```bash
 # 1. 更新版本
-poetry version patch
+uv version --bump patch
 
 # 2. 提交并打 tag
 git add .
 git commit -m "⬆️ bump version"
-git tag v$(poetry version -s)
+git tag v$(uv version --short)
 
 # 3. 推送 tag（自动触发发布）
-git push origin v$(poetry version -s)
+git push origin v$(uv version --short)
 ```
 
 ---
@@ -104,7 +104,7 @@ pip install https://github.com/zol9527/release-cli/releases/download/v<version>/
 ```
 ┌─────────────────┐
 │  更新版本号      │
-│  poetry version │
+│  uv version │
 └────────┬────────┘
          │
          v
@@ -147,10 +147,10 @@ git checkout main
 git pull origin main
 
 # 3. 更新版本号
-poetry version 0.1.0
+uv version 0.1.0
 
 # 4. 提交
-git add pyproject.toml poetry.lock
+git add pyproject.toml uv.lock
 git commit -m "🚀 release: v0.1.0"
 
 # 5. 打 tag
@@ -172,10 +172,10 @@ git push origin main --tags
 # 1. 开发新功能...
 
 # 2. 测试
-poetry run pytest  # 如果有测试
+uv run pytest  # 如果有测试
 
 # 3. 更新版本（minor）
-poetry version minor  # 0.1.0 → 0.2.0
+uv version --bump minor  # 0.1.0 → 0.2.0
 
 # 4. 提交
 git add .
@@ -197,7 +197,7 @@ git push origin main --tags
 # ... 修改代码 ...
 
 # 2. 更新版本（patch）
-poetry version patch  # 0.2.0 → 0.2.1
+uv version --bump patch  # 0.2.0 → 0.2.1
 
 # 3. 提交并推送
 git add .
@@ -245,12 +245,12 @@ permissions:
 **A:** GitHub Release 不允许重复同一 tag，请先删除旧的 Release 和 tag 或使用新版本号
 ```bash
 # 更新版本号
-poetry version patch
+uv version --bump patch
 
 # 重新发布
 git add pyproject.toml
 git commit -m "⬆️ bump version"
-git tag v$(poetry version -s)
+git tag v$(uv version --short)
 git push origin main --tags
 ```
 
@@ -291,9 +291,9 @@ PATCH - 向后兼容的 bug 修复
 
 | 变更类型 | 命令 | 版本变化 |
 |---------|------|---------|
-| Bug 修复 | `poetry version patch` | 0.1.0 → 0.1.1 |
-| 新功能 | `poetry version minor` | 0.1.1 → 0.2.0 |
-| 重大变更 | `poetry version major` | 0.2.0 → 1.0.0 |
+| Bug 修复 | `uv version --bump patch` | 0.1.0 → 0.1.1 |
+| 新功能 | `uv version --bump minor` | 0.1.1 → 0.2.0 |
+| 重大变更 | `uv version --bump major` | 0.2.0 → 1.0.0 |
 
 ---
 
@@ -328,11 +328,11 @@ set -e
 VERSION_TYPE=${1:-patch}
 
 # 更新版本
-poetry version $VERSION_TYPE
-NEW_VERSION=$(poetry version -s)
+uv version --bump $VERSION_TYPE
+NEW_VERSION=$(uv version --short)
 
 # 提交
-git add pyproject.toml poetry.lock
+git add pyproject.toml uv.lock
 git commit -m "🚀 release: v${NEW_VERSION}"
 
 # 打 tag
