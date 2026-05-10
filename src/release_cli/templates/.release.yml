@@ -64,6 +64,20 @@ filter:
 # -----------------------------------------------------------------------------
 # 发布流水线配置
 # -----------------------------------------------------------------------------
+# 整体流程:
+#
+#   release-cli release
+#        │
+#        ▼
+#   ┌─ preflight ──→ 检查环境、分支权限
+#   │
+#   ├─ prepare ────→ 更新版本号 + 生成 changelog
+#   │                 (hook: version.hook 可在此阶段触发)
+#   │
+#   ├─ commit ─────→ auto_stage 自动暂存 → git commit
+#   │
+#   └─ pr ────────→ (可选) push + 创建 PR 到 base_branch
+#
 release:
   # release-cli release 会按这些阶段执行
   steps:
@@ -73,7 +87,13 @@ release:
     - pr
 
   # 允许执行发布的分支正则。空列表表示不限制。
-  allowed_branches: []
+  allowed_branches:
+    - "^main$"
+    - "^master$"
+    - "^release$"
+    - "^dev$"
+    - "^hotfix/.+$"
+    - "^codex/.+$"
 
   # commit 阶段是否自动暂存版本文件、changelog 和常见业务版本文件。
   auto_stage: true
@@ -82,12 +102,6 @@ release:
   create_pr: false
   push: false
   base_branch: release
-
-  # 阶段 hook 示例:
-  # hooks:
-  #   before-prepare:
-  #     - "echo preparing $RELEASE_TAG"
-  hooks: {}
 
 # -----------------------------------------------------------------------------
 # 可选 Python workflow

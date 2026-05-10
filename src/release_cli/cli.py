@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import os
 import sys
 import shutil
 import subprocess
@@ -33,6 +32,14 @@ app = typer.Typer(
 # 全局选项
 _config_path: Optional[str] = None
 RELEASE_FLOW_STEPS = {"preflight", "prepare", "commit", "pr"}
+RELEASE_WORKFLOW_HOOKS = {
+    "before_all",
+    "after_all",
+    "before_step",
+    "after_step",
+    "on_success",
+    "on_failure",
+}
 
 
 def get_config() -> ReleaseConfig:
@@ -171,8 +178,6 @@ release:
   create_pr: false
   push: false
   base_branch: release
-  hooks: {{}}
-
 workflow:
   release:
     script: _shared/workflows/release.py
@@ -377,38 +382,6 @@ def _current_branch(cwd: Path) -> str:
         text=True,
     )
     return result.stdout.strip() if result.returncode == 0 else ""
-
-
-def _run_release_hook(config: ReleaseConfig, hook_name: str, env: dict[str, str], dry_run: bool) -> None:
-    """执行 release 流水线 hook"""
-    commands = config.release_hooks.get(hook_name, [])
-    for command in commands:
-        typer.echo(f"🪝 Hook {hook_name}: {command}")
-        if dry_run:
-            continue
-        subprocess.run(
-            command,
-            cwd=config.packager_root_dir,
-            env=env,
-            shell=True,
-            check=True,
-        )
-
-
-def _release_env(config: ReleaseConfig, step: str, version: str) -> dict[str, str]:
-    """构造 release 流水线 hook 环境变量"""
-    env = dict(os.environ)
-    env.update(
-        {
-            "RELEASE_STEP": step,
-            "RELEASE_VERSION": version,
-            "RELEASE_TAG": _build_release_tag(config, version),
-            "RELEASE_PROJECT_ROOT": str(config.packager_root_dir),
-            "RELEASE_CONFIG": str(config.config_path.resolve()),
-            "RELEASE_VERSION_FILE": str(config.version_file),
-        }
-    )
-    return env
 
 
 def _release_preflight(
@@ -618,9 +591,14 @@ def _load_workflow_steps(script_path: Path) -> dict[str, object]:
 
     steps: dict[str, object] = {}
     for name, value in vars(module).items():
-        if callable(value) and (getattr(value, "__release_cli_step__", False) or name in RELEASE_FLOW_STEPS):
+        if callable(value) and (getattr(value, "__release_cli_step__", False) or _is_workflow_function_name(name)):
             steps[name] = value
     return steps
+
+
+def _is_workflow_function_name(name: str) -> bool:
+    """判断函数名是否是 release workflow 约定名称"""
+    return name in RELEASE_FLOW_STEPS or name in RELEASE_WORKFLOW_HOOKS
 
 
 def _run_custom_release_workflow(
@@ -672,17 +650,8 @@ def _run_custom_release_workflow(
         else:
             raise ValueError(f"不支持的内置 release 步骤: {step_name}")
 
-    typer.echo(f"🐍 Workflow Script: {script_path}")
-    for step_name in selected_steps:
-        workflow_step = workflow_steps.get(step_name)
-        if workflow_step is None:
-            typer.echo("")
-            typer.echo(f"⏭️  [{step_name}] workflow 未定义，跳过")
-            continue
-
-        typer.echo("")
-        typer.echo(f"▶️  [{step_name}]")
-        ctx = WorkflowContext(
+    def make_ctx(step_name: str) -> WorkflowContext:
+        return WorkflowContext(
             config=config,
             version=target_version,
             tag=_build_release_tag(config, target_version),
@@ -690,8 +659,36 @@ def _run_custom_release_workflow(
             dry_run=dry_run,
             builtin_runner=run_builtin,
         )
-        workflow_step(ctx)  # type: ignore[operator]
-        typer.echo(f"✅ [{step_name}] 完成")
+
+    def run_workflow_func(name: str, ctx: WorkflowContext) -> None:
+        workflow_func = workflow_steps.get(name)
+        if workflow_func is not None:
+            workflow_func(ctx)  # type: ignore[operator]
+
+    typer.echo(f"🐍 Workflow Script: {script_path}")
+    try:
+        run_workflow_func("before_all", make_ctx("before_all"))
+        for step_name in selected_steps:
+            workflow_step = workflow_steps.get(step_name)
+            if workflow_step is None:
+                typer.echo("")
+                typer.echo(f"⏭️  [{step_name}] workflow 未定义，跳过")
+                continue
+
+            typer.echo("")
+            typer.echo(f"▶️  [{step_name}]")
+            ctx = make_ctx(step_name)
+            run_workflow_func("before_step", ctx)
+            workflow_step(ctx)  # type: ignore[operator]
+            run_workflow_func("after_step", ctx)
+            typer.echo(f"✅ [{step_name}] 完成")
+    except Exception:
+        run_workflow_func("after_all", make_ctx("after_all"))
+        run_workflow_func("on_failure", make_ctx("on_failure"))
+        raise
+    else:
+        run_workflow_func("after_all", make_ctx("after_all"))
+        run_workflow_func("on_success", make_ctx("on_success"))
 
 
 def _prepare_changelog(
@@ -1218,14 +1215,10 @@ def release_cmd(
             return
 
         changelog_path: Path | None = None
-        _run_release_hook(config, "before-all", _release_env(config, "before-all", target_version), dry_run)
 
         for step in selected_steps:
-            env = _release_env(config, step, target_version)
             typer.echo("")
             typer.echo(f"▶️  [{step}]")
-            _run_release_hook(config, "before-step", env, dry_run)
-            _run_release_hook(config, f"before-{step}", env, dry_run)
 
             if step == "preflight":
                 _release_preflight(
@@ -1251,20 +1244,11 @@ def release_cmd(
             elif step == "pr":
                 _release_pr_step(config, effective_create_pr, effective_push, dry_run)
 
-            _run_release_hook(config, f"after-{step}", env, dry_run)
-            _run_release_hook(config, "after-step", env, dry_run)
             typer.echo(f"✅ [{step}] 完成")
 
-        _run_release_hook(config, "after-all", _release_env(config, "after-all", target_version), dry_run)
-        _run_release_hook(config, "on-success", _release_env(config, "on-success", target_version), dry_run)
         typer.echo("")
         typer.echo("🏁 Release Flow 完成")
     except subprocess.CalledProcessError as error:
-        config = get_config()
-        try:
-            _run_release_hook(config, "on-failure", _release_env(config, "on-failure", value), False)
-        except Exception:
-            pass
         message = error.stderr.strip() if error.stderr else str(error)
         typer.echo(f"❌ {message}", err=True)
         raise typer.Exit(error.returncode or 1) from error

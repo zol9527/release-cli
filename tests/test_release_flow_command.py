@@ -198,3 +198,83 @@ def test_release_flow_skips_missing_custom_workflow_steps(tmp_path: Path) -> Non
     assert result.exit_code == 0
     assert "[preflight] workflow 未定义，跳过" in result.output
     assert "prepare only" in result.output
+
+
+def test_release_flow_runs_lifecycle_functions_in_python_workflow(tmp_path: Path) -> None:
+    _init_git_repo(tmp_path)
+    workflow_path = tmp_path / "release.py"
+    workflow_path.write_text(
+        "def before_all(ctx):\n"
+        "    print('before_all')\n"
+        "def before_step(ctx):\n"
+        "    print(f'before_step:{ctx.step}')\n"
+        "def prepare(ctx):\n"
+        "    print('prepare')\n"
+        "def after_step(ctx):\n"
+        "    print(f'after_step:{ctx.step}')\n"
+        "def after_all(ctx):\n"
+        "    print('after_all')\n"
+        "def on_success(ctx):\n"
+        "    print('on_success')\n",
+        encoding="utf-8",
+    )
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "version:\n"
+        "  source: git-tag\n"
+        "  tag_prefix: app/v\n"
+        "  file: VERSION\n"
+        "workflow:\n"
+        "  release:\n"
+        "    script: release.py\n"
+        "packager:\n"
+        "  root_dir: .\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "VERSION").write_text("v0.1.0\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], check=True, cwd=tmp_path, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "chore: add workflow"], check=True, cwd=tmp_path, capture_output=True, text=True)
+
+    result = runner.invoke(app, ["--config", str(config_file), "release", "patch", "--dry-run", "--only", "prepare"])
+
+    assert result.exit_code == 0
+    expected_order = [
+        "before_all",
+        "before_step:prepare",
+        "prepare",
+        "after_step:prepare",
+        "after_all",
+        "on_success",
+    ]
+    output_lines = [line.strip() for line in result.output.splitlines()]
+    lifecycle_lines = [line for line in output_lines if line in expected_order]
+    assert lifecycle_lines == expected_order
+
+
+def test_release_flow_runs_on_failure_in_python_workflow(tmp_path: Path) -> None:
+    _init_git_repo(tmp_path)
+    workflow_path = tmp_path / "release.py"
+    workflow_path.write_text(
+        "def prepare(ctx):\n"
+        "    raise RuntimeError('boom')\n"
+        "def after_all(ctx):\n"
+        "    print('after_all')\n"
+        "def on_failure(ctx):\n"
+        "    print('on_failure')\n",
+        encoding="utf-8",
+    )
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "workflow:\n"
+        "  release:\n"
+        "    script: release.py\n"
+        "packager:\n"
+        "  root_dir: .\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["--config", str(config_file), "release", "patch", "--only", "prepare"])
+
+    assert result.exit_code != 0
+    assert "after_all" in result.output
+    assert "on_failure" in result.output

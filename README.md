@@ -98,9 +98,10 @@ release:
   create_pr: false
   push: false
   base_branch: release
-  hooks:
-    before-prepare:
-      - "echo preparing $RELEASE_TAG"
+
+workflow:
+  release:
+    script: _shared/workflows/release.py
 ```
 
 如果你希望版本写入后顺手修改 `package.json`、`manifest.json` 等文件，直接编辑 `release-cli init` 生成的 `.release/_shared/version-hook.py` 即可。这个 hook 在 `source: file` 和 `source: git-tag` 下都可以使用，版本来源仍然只由 `version.source` 决定。
@@ -187,7 +188,23 @@ release-cli release patch --skip pr
 release-cli release patch --dry-run
 ```
 
-`release.hooks` 可以挂载阶段 hook，key 支持 `before-all`、`after-all`、`before-step`、`after-step`、`before-prepare`、`after-prepare`、`before-commit`、`after-commit`、`on-success` 等。hook 命令会在 `packager.root_dir` 下执行，并注入 `RELEASE_STEP`、`RELEASE_VERSION`、`RELEASE_TAG`、`RELEASE_PROJECT_ROOT`、`RELEASE_CONFIG` 和 `RELEASE_VERSION_FILE`。
+阶段定制统一写在 `workflow.release.script` 指向的 Python 文件中。模板里的阶段函数可以调用 `ctx.builtin()` 复用内置逻辑；如果省略某个阶段函数，表示该阶段在自定义 workflow 中跳过。
+
+Python workflow 支持清晰的生命周期函数：
+
+```python
+def before_all(ctx): ...
+def before_step(ctx): ...
+def before_prepare(ctx): ...
+def prepare(ctx): ...
+def after_prepare(ctx): ...
+def after_step(ctx): ...
+def after_all(ctx): ...
+def on_success(ctx): ...
+def on_failure(ctx): ...
+```
+
+`before_{step}` / `{step}` / `after_{step}` 中的 `step` 对应 `preflight`、`prepare`、`commit`、`pr`。
 
 `release-cli pack` 不再接收版本参数，而是会读取 `docs/changes` 下最新 changelog 的 frontmatter 中的 `version` 字段作为打包版本。如果还没有生成 changelog，命令会直接报错并提示先执行 `release-cli version --write`。
 

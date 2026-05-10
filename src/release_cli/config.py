@@ -68,7 +68,6 @@ class ReleaseConfig:
                 "create_pr": False,
                 "push": False,
                 "base_branch": "release",
-                "hooks": {},
             },
             "packager": {
                 "name": "{name}-{version}",
@@ -223,22 +222,6 @@ class ReleaseConfig:
     def release_base_branch(self) -> str:
         """发布 PR 的目标分支"""
         return str(self.release_config.get("base_branch", "release")).strip() or "release"
-
-    @property
-    def release_hooks(self) -> dict[str, list[str]]:
-        """发布流水线阶段 hook 命令"""
-        hooks = self.release_config.get("hooks", {})
-        if not isinstance(hooks, dict):
-            return {}
-
-        normalized: dict[str, list[str]] = {}
-        for name, commands in hooks.items():
-            if isinstance(commands, str):
-                normalized[str(name)] = [commands]
-                continue
-            if isinstance(commands, list):
-                normalized[str(name)] = [str(command) for command in commands if str(command).strip()]
-        return normalized
 
     def resolve_project_path(self, value: str | Path) -> Path:
         """将路径解析为相对发布单元根目录的绝对路径"""
