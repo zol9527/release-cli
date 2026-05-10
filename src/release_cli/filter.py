@@ -18,40 +18,72 @@ class Commit:
     date: str | None = None
 
 
+@dataclass
+class ParsedCommit:
+    """解析后的提交信息"""
+    type: str
+    scope: str | None = None
+
+
+# 默认 Emoji 映射（当配置文件中未指定 emoji_map 时使用）
+_DEFAULT_EMOJI_MAP: dict[str, str] = {
+    "✨": "feat",
+    "🐛": "fix",
+    "🛡️": "security",
+    "🛡": "security",
+    "⚡️": "perf",
+    "⚡": "perf",
+    "♻️": "refactor",
+    "♻": "refactor",
+    "🔒": "security",
+    "🔐": "security",
+    "🔧": "chore",
+    "💄": "style",
+    "✅": "test",
+    "📝": "docs",
+    "📄": "docs",
+}
+
+
 class CommitFilter:
     """提交过滤器"""
 
-    # 常见的 Emoji 和对应的提交类型
-    EMOJI_MAP = {
-        "✨": "feat",
-        "🐛": "fix",
-        "🛡️": "security",
-        "🛡": "security",
-        "⚡️": "perf",
-        "⚡": "perf",
-        "♻️": "refactor",
-        "♻": "refactor",
-        "🔒": "security",
-        "🔐": "security",
-        "🔧": "chore",
-        "💄": "style",
-        "✅": "test",
-        "📝": "docs",
-        "📄": "docs",
-    }
-
     def __init__(self, config: ReleaseConfig):
         self.config = config
+        # 配置文件中的 emoji_map 优先，否则使用默认映射
+        config_emoji_map = config.emoji_map
+        self.emoji_map: dict[str, str] = config_emoji_map if config_emoji_map else dict(_DEFAULT_EMOJI_MAP)
 
     def filter_commits(self, commits: list[str]) -> list[str]:
         """过滤提交列表"""
-        filtered = []
+        return [commit for commit in commits if self._should_keep(commit)]
 
-        for commit in commits:
-            if self._should_keep(commit):
-                filtered.append(commit)
+    def _parse_commit(self, commit: str) -> ParsedCommit | None:
+        """统一解析提交消息，提取类型和 scope
 
-        return filtered
+        支持以下格式:
+          - feat: message           → type=feat, scope=None
+          - feat(ui): message       → type=feat, scope=ui
+          - ✨ message              → type=feat, scope=None
+          - ✨(ui): message         → type=feat, scope=ui
+        """
+        commit_lower = commit.lower().strip()
+
+        # 1. 尝试匹配 conventional commit 格式: type(scope): message
+        match = re.match(r"^(\w+)(?:\(([^)]+)\))?\s*:", commit_lower)
+        if match:
+            return ParsedCommit(type=match.group(1), scope=match.group(2))
+
+        # 2. 尝试匹配 emoji 格式
+        for emoji, commit_type in self.emoji_map.items():
+            if commit.startswith(emoji):
+                # emoji 后可能带 (scope): 格式
+                rest = commit[len(emoji):].strip()
+                scope_match = re.match(r"^\(([^)]+)\)\s*:", rest)
+                scope = scope_match.group(1) if scope_match else None
+                return ParsedCommit(type=commit_type, scope=scope)
+
+        return None
 
     def _should_keep(self, commit: str) -> bool:
         """判断是否保留提交"""
@@ -72,29 +104,15 @@ class CommitFilter:
         if not keep_types:
             return True
 
-        for commit_type in keep_types:
-            # 检查传统格式: feat:, fix:, perf:
-            if re.search(rf"^{commit_type}\b", commit_lower):
-                return True
-
-            # 检查带括号格式: feat(ui):
-            if re.search(rf"^{commit_type}\([^)]+\):", commit_lower):
-                return True
-
-            # 检查 Emoji 格式
-            for emoji in self._get_emojis_for_type(commit_type):
-                if commit.startswith(emoji):
-                    return True
+        parsed = self._parse_commit(commit)
+        if parsed and parsed.type in keep_types:
+            return True
 
         return False
 
-    def _get_emojis_for_type(self, commit_type: str) -> list[str]:
-        """获取类型对应的所有 Emoji"""
-        return [emoji for emoji, ctype in self.EMOJI_MAP.items() if ctype == commit_type]
-
     def categorize_commits(self, commits: list[str]) -> dict[str, list[str]]:
         """分类提交"""
-        categories = {
+        categories: dict[str, list[str]] = {
             "features": [],
             "fixes": [],
             "perf": [],
@@ -122,20 +140,9 @@ class CommitFilter:
         return categories
 
     def _detect_commit_type(self, commit: str) -> str | None:
-        """识别提交类型，兼容 conventional commit 与 emoji 风格"""
-        commit_lower = commit.lower().strip()
-
-        for commit_type in ["feat", "fix", "perf", "refactor", "security"]:
-            if re.search(rf"^{commit_type}\b", commit_lower):
-                return commit_type
-            if re.search(rf"^{commit_type}\([^)]+\):", commit_lower):
-                return commit_type
-
-        for emoji, commit_type in self.EMOJI_MAP.items():
-            if commit.startswith(emoji):
-                return commit_type
-
-        return None
+        """识别提交类型"""
+        parsed = self._parse_commit(commit)
+        return parsed.type if parsed else None
 
 
 def filter_commits(commits: list[str], config_path: str | None = None) -> list[str]:
