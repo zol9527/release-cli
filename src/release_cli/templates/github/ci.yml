@@ -1,0 +1,67 @@
+# =============================================================================
+# CI 工作流配置模板
+# =============================================================================
+# 功能说明:
+#   持续集成工作流，在 Push 和 Pull Request 时自动执行代码验证
+#
+# 触发条件:
+#   - 推送到 main/master 分支
+#   - 向 main/master 分支提交 PR
+#
+# 执行任务:
+#   - 代码检查 (Lint)
+#   - 单元测试 (Unit tests)
+#   - 构建验证 (Build)
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ===========================================================
+      # TODO: 在此添加你的 CI 步骤
+      #
+      # 示例 - Node.js 项目:
+      # - name: Install dependencies
+      #   run: npm install
+      # - name: Run tests
+      #   run: npm test
+      # - name: Lint
+      #   run: npm run lint
+      # - name: Build
+      #   run: npm run build
+      #
+      # 示例 - Python 项目:
+      # - name: Install dependencies
+      #   run: pip install -r requirements.txt
+      # - name: Run tests
+      #   run: pytest
+      #
+      # 示例 - Go 项目:
+      # - name: Run tests
+      #   run: go test ./...
+      # - name: Build
+      #   run: go build ./...
+      # ===========================================================
+
+      - name: CI passed
+        run: echo "✅ CI 检查通过"

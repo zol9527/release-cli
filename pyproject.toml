@@ -1,0 +1,66 @@
+[project]
+name = "release-cli"
+version = "0.1.0"
+description = "轻量级自动化发布工具"
+authors = [{ name = "loyd", email = "loyd@example.com" }]
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+keywords = ["release", "deploy", "automation", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "typer>=0.9.0",
+    "pyyaml>=6.0",
+    "packaging>=23.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/zol9527/release-cli"
+Repository = "https://github.com/zol9527/release-cli"
+Documentation = "https://github.com/zol9527/release-cli#readme"
+Issues = "https://github.com/zol9527/release-cli/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+[project.scripts]
+release-cli = "release_cli.cli:app"
+
+[tool.poetry]
+packages = [
+    { include = "release_cli", from = "src" },
+]
+include = [
+    { path = "src/release_cli/templates/**/*", format = ["sdist", "wheel"] },
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.0"
+pytest-cov = ">=4.0"
+ruff = ">=0.1.0"
+mypy = ">=1.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "TC", "RUF"]
+ignore = ["E501", "TRY003"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false

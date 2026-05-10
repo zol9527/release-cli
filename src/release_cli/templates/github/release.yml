@@ -1,0 +1,82 @@
+# =============================================================================
+# Release 工作流配置模板
+# =============================================================================
+# 功能说明:
+#   发布工作流，在推送 tag 时自动创建 GitHub Release
+#
+# 触发条件:
+#   - 推送 v* 格式的 tag（如 v1.0.0）
+#
+# 执行任务:
+#   - 构建项目
+#   - 打包发布文件
+#   - 创建 GitHub Release
+#   - 上传发布文件
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ===========================================================
+      # TODO: 在此添加你的构建步骤
+      #
+      # 示例 - Node.js 项目:
+      # - name: Install dependencies
+      #   run: npm install
+      # - name: Build
+      #   run: npm run build
+      #
+      # 示例 - Python 项目:
+      # - name: Install dependencies
+      #   run: pip install -r requirements.txt
+      # - name: Build
+      #   run: python setup.py build
+      #
+      # 示例 - Go 项目:
+      # - name: Build
+      #   run: go build -o bin/app ./cmd/app
+      # ===========================================================
+
+      # ===========================================================
+      # TODO: 在此添加你的打包步骤
+      #
+      # 示例 - 打包 dist 目录:
+      # - name: Create release package
+      #   run: |
+      #     mkdir -p release
+      #     zip -r release/${{ github.event.repository.name }}-${{ github.ref_name }}.zip ./dist
+      #
+      # 示例 - 打包多个文件:
+      # - name: Create release packages
+      #   run: |
+      #     mkdir -p release
+      #     zip -r release/app-linux-${{ github.ref_name }}.zip ./dist/linux
+      #     zip -r release/app-macos-${{ github.ref_name }}.zip ./dist/macos
+      #     zip -r release/app-windows-${{ github.ref_name }}.zip ./dist/windows
+      # ===========================================================
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          # 指定要上传的文件（支持通配符）
+          # files: release/**
+          generate_release_notes: true
+          # 自定义 Release 标题（可选）
+          # title: Release ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
