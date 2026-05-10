@@ -44,7 +44,7 @@ include = [
 ]
 
 [tool.poetry.group.dev.dependencies]
-pytest = ">=7.0"
+pytest = ">=9.0.3"
 pytest-cov = ">=4.0"
 ruff = ">=0.1.0"
 mypy = ">=1.0"
