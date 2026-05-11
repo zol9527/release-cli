@@ -1,6 +1,6 @@
 [project]
 name = "release-cli"
-version = "0.2.1"
+version = "0.2.2"
 description = "轻量级自动化发布工具"
 authors = [{ name = "loyd", email = "loyd@example.com" }]
 readme = "README.md"
