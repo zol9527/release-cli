@@ -18,7 +18,7 @@ from packaging.version import InvalidVersion, Version
 from .config import ReleaseConfig
 from .filter import CommitFilter
 from .packager import Packager
-from .version import VersionManager, get_default_changelog_range
+from .version import VersionManager, get_default_changelog_range, list_release_tags
 from .workflow import WorkflowContext
 
 app = typer.Typer(
@@ -410,7 +410,21 @@ def _release_preflight(
 
     dirty = _git_output_checked(cwd, ["status", "--short"])
     if dirty and not allow_dirty:
-        raise ValueError("工作区存在未提交变更，请先清理，或传入 --allow-dirty")
+        # 首发时（无 release tag），允许 VERSION 文件有未提交变更
+        has_release_tags = bool(list_release_tags(cwd, ["--merged", "HEAD"], config.version_tag_prefix))
+        if not has_release_tags:
+            version_file_relative = _try_relative_path(config.version_file, cwd)
+            dirty_lines = [line for line in dirty.splitlines()
+                           if version_file_relative not in line]
+            if not dirty_lines:
+                typer.echo(f"ℹ️  首发模式：允许 VERSION 文件存在未提交变更")
+            else:
+                raise ValueError(
+                    f"工作区存在未提交变更（不含 VERSION 文件），请先清理:\n"
+                    + "\n".join(f"  {line}" for line in dirty_lines)
+                )
+        else:
+            raise ValueError("工作区存在未提交变更，请先清理，或传入 --allow-dirty")
 
     tag_name = _build_release_tag(config, target_version)
     existing_tag = _git_output_checked(cwd, ["tag", "--list", tag_name])
@@ -750,12 +764,24 @@ def _git_ref_exists(cwd: Path, ref: str) -> bool:
     return result.returncode == 0
 
 
+def _try_relative_path(path: Path, base: Path) -> str:
+    """尝试将路径转为相对路径，失败则返回绝对路径字符串"""
+    try:
+        return path.resolve().relative_to(base.resolve()).as_posix()
+    except ValueError:
+        return str(path.resolve())
+
+
 def _ensure_release_files_ready(
     config: ReleaseConfig,
     staged_files: set[Path],
     cwd: Path,
 ) -> tuple[str, Path, str]:
-    """校验发布文件是否齐全且已纳入本次提交"""
+    """校验发布文件是否齐全且已纳入本次提交
+
+    首发场景下（无 release tag），如果 VERSION 文件内容已经与目标版本一致
+    但未被 staged（git add 不会 stage 内容相同的文件），视为通过。
+    """
     version_file = config.version_file.resolve()
     normalized_version = _resolve_written_release_version(config)
 
@@ -779,10 +805,24 @@ def _ensure_release_files_ready(
             f"changelog 中的版本为 v{normalized_changelog_version}，与版本文件中的 v{normalized_version} 不一致"
         )
 
-    expected_paths = {version_file, changelog_path}
-    missing_staged = [path for path in expected_paths if path not in staged_files]
-    if missing_staged:
-        missing_names = "\n".join(f"- {path}" for path in sorted(missing_staged))
+    # 首发时检查：无 release tag 则允许 VERSION 文件内容已正确但未 staged
+    is_first_release = not bool(list_release_tags(cwd, ["--merged", "HEAD"], config.version_tag_prefix))
+
+    missing = []
+    for path in (version_file, changelog_path):
+        if path in staged_files:
+            continue
+        # 首发时：VERSION 文件内容已正确 → 放行
+        if is_first_release and path == version_file:
+            if path.exists():
+                content = path.read_text(encoding="utf-8").strip().removeprefix("v")
+                if content == normalized_version:
+                    typer.echo(f"ℹ️  首发模式：{path.name} 内容已正确但未暂存，视为通过")
+                    continue
+        missing.append(path)
+
+    if missing:
+        missing_names = "\n".join(f"- {path}" for path in sorted(missing))
         raise ValueError(f"以下发布文件尚未纳入本次提交:\n{missing_names}")
 
     unstaged = subprocess.run(
