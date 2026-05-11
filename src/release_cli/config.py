@@ -74,8 +74,9 @@ class ReleaseConfig:
                 "root_dir": ".",
                 "output_dir": "release",
                 "respect_gitignore": False,
-                "include": ["*", ".*"],
+                "include": ["*"],
                 "exclude": [".git", ".github", ".beads", ".venv", "node_modules", "release"],
+                "force_include": [],
             },
         }
 
@@ -271,6 +272,11 @@ class ReleaseConfig:
     def packager_exclude(self) -> list[str]:
         """打包排除的文件"""
         return self._config.get("packager", {}).get("exclude", [])
+
+    @property
+    def packager_force_include(self) -> list[str]:
+        """打包过滤后强制加回的文件"""
+        return self._config.get("packager", {}).get("force_include", [])
 
 
 def load_config(config_path: str | Path | None = None) -> ReleaseConfig:

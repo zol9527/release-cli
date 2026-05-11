@@ -188,9 +188,7 @@ packager:
   name: "{unit}-{{version}}"
   respect_gitignore: true
   include:
-    - package.json
-    - docs/changes
-    - src
+    - "*"
   exclude:
     - .git
     - .github
@@ -200,6 +198,7 @@ packager:
     - node_modules
     - dist
     - release
+  force_include: []
 """
 
 

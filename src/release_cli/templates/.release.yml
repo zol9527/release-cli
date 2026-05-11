@@ -129,12 +129,10 @@ packager:
   # 开启后可以少写 node_modules、dist、临时日志等重复排除项。
   respect_gitignore: true
 
-  # 需要打包的文件/目录
+  # 需要打包的候选范围。
+  # `*` 在 release-cli 中会匹配根目录下全部入口, 包括隐藏文件和隐藏目录。
   include:
-    - src
-    - package.json
-    - pyproject.toml
-    - .release/_state/VERSION
+    - "*"
 
   # 不需要打进 zip 的文件或目录
   exclude:
@@ -145,3 +143,7 @@ packager:
     - .venv
     - node_modules
     - release
+
+  # 过滤后仍要强制加回的特例文件/目录。
+  # 适合处理被 .gitignore 或 exclude 覆盖, 但发布包仍必须携带的少量文件。
+  force_include: []

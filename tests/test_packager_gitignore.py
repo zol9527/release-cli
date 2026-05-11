@@ -53,6 +53,29 @@ def test_packager_can_respect_gitignore_rules(tmp_path: Path) -> None:
     assert "build/cache.bin" not in names
 
 
+def test_packager_star_include_collects_hidden_entries(tmp_path: Path) -> None:
+    """include 的 * 会收集隐藏文件和隐藏目录"""
+    (tmp_path / ".release").mkdir()
+    (tmp_path / ".release" / "release.yml").write_text("release\n", encoding="utf-8")
+    (tmp_path / ".env.example").write_text("env\n", encoding="utf-8")
+    (tmp_path / "app.txt").write_text("app\n", encoding="utf-8")
+
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "packager:\n  root_dir: .\n  output_dir: release\n  include:\n    - '*'\n  exclude: []\n",
+        encoding="utf-8",
+    )
+
+    output_path = Packager(ReleaseConfig(config_file)).create_package("1.0.0")
+
+    with zipfile.ZipFile(output_path) as archive:
+        names = set(archive.namelist())
+
+    assert ".release/release.yml" in names
+    assert ".env.example" in names
+    assert "app.txt" in names
+
+
 def test_packager_keeps_ignored_files_when_gitignore_option_is_disabled(tmp_path: Path) -> None:
     """未开启 respect_gitignore 时保持旧行为, 只应用 packager.exclude"""
     _init_git_repo(tmp_path)
@@ -80,3 +103,41 @@ def test_packager_keeps_ignored_files_when_gitignore_option_is_disabled(tmp_path
 
     assert "debug.log" in names
     assert "build/cache.bin" in names
+
+
+def test_packager_force_include_runs_after_gitignore_and_exclude(tmp_path: Path) -> None:
+    """force_include 可以在 gitignore 和 exclude 过滤后加回特例文件"""
+    _init_git_repo(tmp_path)
+    (tmp_path / ".gitignore").write_text("build/\n", encoding="utf-8")
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "cache.bin").write_text("cache\n", encoding="utf-8")
+    (tmp_path / "build" / "keep.txt").write_text("keep\n", encoding="utf-8")
+    (tmp_path / "secret.txt").write_text("secret\n", encoding="utf-8")
+    (tmp_path / "app.txt").write_text("app\n", encoding="utf-8")
+
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "packager:\n"
+        "  root_dir: .\n"
+        "  output_dir: release\n"
+        "  respect_gitignore: true\n"
+        "  include:\n"
+        "    - '*'\n"
+        "  exclude:\n"
+        "    - .git\n"
+        "    - secret.txt\n"
+        "  force_include:\n"
+        "    - build/keep.txt\n"
+        "    - secret.txt\n",
+        encoding="utf-8",
+    )
+
+    output_path = Packager(ReleaseConfig(config_file)).create_package("1.0.0")
+
+    with zipfile.ZipFile(output_path) as archive:
+        names = set(archive.namelist())
+
+    assert "app.txt" in names
+    assert "build/keep.txt" in names
+    assert "secret.txt" in names
+    assert "build/cache.bin" not in names

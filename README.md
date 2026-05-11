@@ -76,15 +76,13 @@ packager:
   name: "{name}-{version}"
   respect_gitignore: true
   include:
-    - src
-    - package.json
-    - pyproject.toml
-    - .release/_state/VERSION
+    - "*"
   exclude:
     - .git
     - .github
     - .beads
     - __pycache__
+  force_include: []
 
 release:
   steps:

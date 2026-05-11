@@ -91,32 +91,42 @@ class Packager:
         """根据配置收集需要打包的文件列表"""
         root = self.config.packager_root_dir
         exclude_patterns = self._exclude_patterns()
+        output_exclude_patterns: list[str] = []
         with suppress(ValueError):
-            exclude_patterns.append(output_dir.resolve().relative_to(root).as_posix())
+            output_exclude_patterns.append(output_dir.resolve().relative_to(root).as_posix())
 
+        files = self._collect_pattern_files(self.config.packager_include, root)
+        files = self._filter_gitignored(files, root)
+        files = self._filter_excluded(files, root, exclude_patterns + output_exclude_patterns)
+
+        force_files = self._collect_pattern_files(self.config.packager_force_include, root)
+        collected = dict.fromkeys(files)
+        collected.update(dict.fromkeys(force_files))
+        files = list(collected)
+        files = self._filter_excluded(files, root, output_exclude_patterns)
+
+        return sorted(files, key=lambda item: item.relative_to(root).as_posix())
+
+    def _collect_pattern_files(self, patterns: list[str], root: Path) -> list[Path]:
+        """按配置模式收集候选文件"""
         collected: dict[Path, None] = {}
 
-        for pattern in self.config.packager_include:
+        for pattern in patterns:
             if pattern.startswith("!"):
                 continue
 
             for path in root.glob(pattern):
                 if path.is_file():
-                    relative_path = path.relative_to(root)
-                    if not self._is_excluded(relative_path, exclude_patterns):
-                        collected[path] = None
+                    collected[path] = None
                     continue
 
                 if path.is_dir():
                     for file_path in path.rglob("*"):
                         if not file_path.is_file():
                             continue
-                        relative_path = file_path.relative_to(root)
-                        if not self._is_excluded(relative_path, exclude_patterns):
-                            collected[file_path] = None
+                        collected[file_path] = None
 
-        files = sorted(collected, key=lambda item: item.relative_to(root).as_posix())
-        return self._filter_gitignored(files, root)
+        return list(collected)
 
     def _exclude_patterns(self) -> list[str]:
         """合并新旧配置格式的排除模式"""
@@ -130,6 +140,13 @@ class Packager:
         """检查文件是否命中排除规则"""
         path_str = path.as_posix()
         return any(self._match_pattern(path_str, pattern) for pattern in patterns)
+
+    def _filter_excluded(self, files: list[Path], root: Path, patterns: list[str]) -> list[Path]:
+        """按 exclude 规则过滤文件列表"""
+        if not patterns:
+            return files
+
+        return [file for file in files if not self._is_excluded(file.relative_to(root), patterns)]
 
     def _filter_gitignored(self, files: list[Path], root: Path) -> list[Path]:
         """根据 Git ignore 规则过滤候选文件
