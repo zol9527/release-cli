@@ -125,6 +125,10 @@ packager:
   # 输出文件名模板（最终会自动追加 .zip）
   name: "{name}-{version}"
 
+  # 是否额外遵循 .gitignore / .git/info/exclude 等 Git ignore 规则。
+  # 开启后可以少写 node_modules、dist、临时日志等重复排除项。
+  respect_gitignore: true
+
   # 需要打包的文件/目录
   include:
     - src

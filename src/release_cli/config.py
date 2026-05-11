@@ -73,6 +73,7 @@ class ReleaseConfig:
                 "name": "{name}-{version}",
                 "root_dir": ".",
                 "output_dir": "release",
+                "respect_gitignore": False,
                 "include": ["*", ".*"],
                 "exclude": [".git", ".github", ".beads", ".venv", "node_modules", "release"],
             },
@@ -255,6 +256,11 @@ class ReleaseConfig:
             return output_path
 
         return (self.packager_root_dir / output_path).resolve()
+
+    @property
+    def packager_respect_gitignore(self) -> bool:
+        """打包时是否额外遵循 Git ignore 规则"""
+        return bool(self._config.get("packager", {}).get("respect_gitignore", False))
 
     @property
     def packager_include(self) -> list[str]:

@@ -178,6 +178,7 @@ packager:
   root_dir: .
   output_dir: release
   name: "{name}-{version}"
+  respect_gitignore: true
   include:
     - src
     - package.json
@@ -194,9 +195,10 @@ packager:
 说明：
 
 1. `include` 支持文件、目录和 glob。
-2. `exclude` 会基于项目相对路径过滤，不会把命中的文件写进 zip。
-3. 输出始终为 zip，文件名由 `name` 模板和“最新 changelog frontmatter 中的 version”共同决定。
-4. 如果配置文件不在项目根目录，把 `packager.root_dir` 调整为正确的项目根，比如 `..`。
+2. `respect_gitignore: true` 会额外复用 Git ignore 规则过滤候选文件，适合把 `node_modules`、`dist`、日志等重复排除项交给 `.gitignore` 管理。
+3. `exclude` 会基于项目相对路径过滤，不会把命中的文件写进 zip；它仍然可以用于发布包专属的额外排除规则。
+4. 输出始终为 zip，文件名由 `name` 模板和“最新 changelog frontmatter 中的 version”共同决定。
+5. 如果配置文件不在项目根目录，把 `packager.root_dir` 调整为正确的项目根，比如 `..`。
 
 执行 `release-cli pack` 前，必须已经通过 `release-cli version --write` 生成过 changelog。命令会从 `docs/changes` 目录中定位最新的 changelog 文件，并读取其 frontmatter 里的 `version` 字段作为最终打包版本。
 

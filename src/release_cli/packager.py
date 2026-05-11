@@ -5,12 +5,17 @@ from __future__ import annotations
 import fnmatch
 import json
 import re
+import subprocess
 import tomllib
 import zipfile
+from contextlib import suppress
 from datetime import datetime
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from .config import ReleaseConfig
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class Packager:
@@ -86,10 +91,8 @@ class Packager:
         """根据配置收集需要打包的文件列表"""
         root = self.config.packager_root_dir
         exclude_patterns = self._exclude_patterns()
-        try:
+        with suppress(ValueError):
             exclude_patterns.append(output_dir.resolve().relative_to(root).as_posix())
-        except ValueError:
-            pass
 
         collected: dict[Path, None] = {}
 
@@ -112,18 +115,59 @@ class Packager:
                         if not self._is_excluded(relative_path, exclude_patterns):
                             collected[file_path] = None
 
-        return sorted(collected, key=lambda item: item.relative_to(root).as_posix())
+        files = sorted(collected, key=lambda item: item.relative_to(root).as_posix())
+        return self._filter_gitignored(files, root)
 
     def _exclude_patterns(self) -> list[str]:
         """合并新旧配置格式的排除模式"""
         patterns = list(self.config.packager_exclude)
-        patterns.extend(pattern[1:] for pattern in self.config.packager_include if pattern.startswith("!"))
+        patterns.extend(
+            pattern[1:] for pattern in self.config.packager_include if pattern.startswith("!")
+        )
         return patterns
 
     def _is_excluded(self, path: Path, patterns: list[str]) -> bool:
         """检查文件是否命中排除规则"""
         path_str = path.as_posix()
         return any(self._match_pattern(path_str, pattern) for pattern in patterns)
+
+    def _filter_gitignored(self, files: list[Path], root: Path) -> list[Path]:
+        """根据 Git ignore 规则过滤候选文件
+
+        这里直接复用 `git check-ignore --no-index`, 避免在 Python 里重新实现
+        `.gitignore` 的目录匹配、通配符、取反规则和多层 ignore 文件语义。
+        如果当前目录不是 Git 工作区, 或运行环境没有 git, 则保持原候选列表不变。
+        """
+        if not self.config.packager_respect_gitignore or not files:
+            return files
+
+        relative_paths = [file.relative_to(root).as_posix() for file in files]
+        check_input = "\n".join(relative_paths) + "\n"
+
+        try:
+            result = subprocess.run(
+                ["git", "check-ignore", "--no-index", "--stdin"],
+                cwd=root,
+                input=check_input,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        except (FileNotFoundError, OSError):
+            return files
+
+        # 0 表示存在命中项, 1 表示没有任何命中项; 其他状态通常是非 Git 工作区等环境问题。
+        if result.returncode == 1:
+            return files
+        if result.returncode != 0:
+            return files
+
+        ignored_paths = {line for line in result.stdout.splitlines() if line}
+        return [
+            file
+            for file, relative_path in zip(files, relative_paths, strict=True)
+            if relative_path not in ignored_paths
+        ]
 
     def _match_pattern(self, path: str, pattern: str) -> bool:
         """检查路径是否匹配模式"""
@@ -146,7 +190,7 @@ class Packager:
 
 
 def create_package(version: str, config_path: str | None = None) -> Path:
-    """创建安装包（便捷函数）"""
+    """创建安装包(便捷函数)"""
     config = ReleaseConfig(config_path)
     packager = Packager(config)
     return packager.create_package(version)

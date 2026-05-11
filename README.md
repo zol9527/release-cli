@@ -74,6 +74,7 @@ packager:
   root_dir: ..
   output_dir: release
   name: "{name}-{version}"
+  respect_gitignore: true
   include:
     - src
     - package.json

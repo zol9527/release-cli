@@ -186,6 +186,7 @@ packager:
   root_dir: ../apps/{unit}
   output_dir: release
   name: "{unit}-{{version}}"
+  respect_gitignore: true
   include:
     - package.json
     - docs/changes
