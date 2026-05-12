@@ -75,6 +75,9 @@ packager:
   output_dir: release
   name: "{name}-{version}"
   respect_gitignore: true
+  build:
+    enabled: false
+    script: _shared/hooks/hook-pack.py
   include:
     - "*"
   exclude:
@@ -209,6 +212,18 @@ def on_failure(ctx): ...
 `before_{step}` / `{step}` / `after_{step}` 中的 `step` 对应 `preflight`、`prepare`、`commit`、`pr`。
 
 `release-cli pack` 不再接收版本参数，而是会读取 `docs/changes` 下最新 changelog 的 frontmatter 中的 `version` 字段作为打包版本。如果还没有生成 changelog，命令会直接报错并提示先执行 `release-cli version --write`。
+
+`packager.build.enabled` 决定 pack 是否先构建再压缩：
+
+```yaml
+packager:
+  build:
+    enabled: true
+    script: _shared/hooks/hook-pack.py
+```
+
+当 `enabled: false` 时，pack 只按 `root_dir`、`include`、`exclude`、`force_include` 压缩当前 workspace，适合分享单独 workspace。  
+当 `enabled: true` 时，pack 会先执行 `hook-pack.py` 中的 `build(ctx)`，再执行内置压缩逻辑，适合生成可以直接部署的构建产物包。
 
 ## 文档
 

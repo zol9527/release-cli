@@ -75,6 +75,10 @@ class ReleaseConfig:
                 "root_dir": ".",
                 "output_dir": "release",
                 "respect_gitignore": False,
+                "build": {
+                    "enabled": False,
+                    "script": None,
+                },
                 "include": ["*"],
                 "exclude": [".git", ".github", ".beads", ".venv", "node_modules", "release"],
                 "force_include": [],
@@ -269,6 +273,25 @@ class ReleaseConfig:
     def packager_respect_gitignore(self) -> bool:
         """打包时是否额外遵循 Git ignore 规则"""
         return bool(self._config.get("packager", {}).get("respect_gitignore", False))
+
+    @property
+    def packager_build_enabled(self) -> bool:
+        """pack 阶段是否先执行用户自定义构建流程"""
+        build = self._config.get("packager", {}).get("build", {})
+        if not isinstance(build, dict):
+            return False
+        return bool(build.get("enabled", False))
+
+    @property
+    def packager_build_script(self) -> Path | None:
+        """pack 阶段的构建 Hook 脚本"""
+        build = self._config.get("packager", {}).get("build", {})
+        if not isinstance(build, dict):
+            return None
+        script = build.get("script")
+        if not script:
+            return None
+        return self._resolve_path(str(script))
 
     @property
     def packager_include(self) -> list[str]:

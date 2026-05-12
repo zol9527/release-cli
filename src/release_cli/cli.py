@@ -32,6 +32,7 @@ app = typer.Typer(
 # 全局选项
 _config_path: Optional[str] = None
 RELEASE_FLOW_STEPS = {"preflight", "prepare", "commit", "pr"}
+PACK_WORKFLOW_STEPS = {"build", "pack"}
 RELEASE_WORKFLOW_HOOKS = {
     "before_all",
     "after_all",
@@ -188,6 +189,9 @@ packager:
   output_dir: release
   name: "{unit}-{{version}}"
   respect_gitignore: true
+  build:
+    enabled: false
+    script: _shared/hooks/hook-pack.py
   include:
     - "*"
   exclude:
@@ -597,7 +601,7 @@ def _release_pr_step(config: ReleaseConfig, create_pr: bool, push: bool, dry_run
     typer.echo(f"✅ 已创建到 {config.release_base_branch} 的发布 PR")
 
 
-def _load_workflow_steps(script_path: Path) -> dict[str, object]:
+def _load_workflow_steps(script_path: Path, allowed_names: set[str] | None = None) -> dict[str, object]:
     """加载用户自定义 workflow 脚本中的 @step 函数"""
     if not script_path.is_file():
         raise ValueError(f"workflow 脚本不存在: {script_path}")
@@ -617,14 +621,18 @@ def _load_workflow_steps(script_path: Path) -> dict[str, object]:
 
     steps: dict[str, object] = {}
     for name, value in vars(module).items():
-        if callable(value) and (getattr(value, "__release_cli_step__", False) or _is_workflow_function_name(name)):
+        if callable(value) and (
+            getattr(value, "__release_cli_step__", False)
+            or _is_workflow_function_name(name, allowed_names)
+        ):
             steps[name] = value
     return steps
 
 
-def _is_workflow_function_name(name: str) -> bool:
+def _is_workflow_function_name(name: str, allowed_names: set[str] | None = None) -> bool:
     """判断函数名是否是 release workflow 约定名称"""
-    return name in RELEASE_FLOW_STEPS or name in RELEASE_WORKFLOW_HOOKS
+    stage_names = allowed_names or RELEASE_FLOW_STEPS
+    return name in stage_names or name in RELEASE_WORKFLOW_HOOKS
 
 
 def _run_custom_release_workflow(
@@ -715,6 +723,70 @@ def _run_custom_release_workflow(
     else:
         run_workflow_func("after_all", make_ctx("after_all"))
         run_workflow_func("on_success", make_ctx("on_success"))
+
+
+def _run_pack_workflow(
+    config: ReleaseConfig,
+    *,
+    script_path: Path,
+    version: str,
+    output_dir: Path | None,
+) -> Path:
+    """执行用户自定义 pack workflow，并返回最终 zip 路径"""
+    workflow_steps = _load_workflow_steps(script_path, PACK_WORKFLOW_STEPS)
+    packager = Packager(config)
+    output_path: Path | None = None
+
+    def run_builtin(step_name: str) -> None:
+        nonlocal output_path
+        if step_name == "build":
+            return
+        if step_name == "pack":
+            output_path = packager.create_package(version, output_dir)
+            return
+        raise ValueError(f"不支持的内置 pack 步骤: {step_name}")
+
+    def make_ctx(step_name: str) -> WorkflowContext:
+        return WorkflowContext(
+            config=config,
+            version=version,
+            tag=_build_release_tag(config, version),
+            step=step_name,
+            dry_run=False,
+            builtin_runner=run_builtin,
+        )
+
+    def run_workflow_func(name: str, ctx: WorkflowContext) -> None:
+        workflow_func = workflow_steps.get(name)
+        if workflow_func is not None:
+            workflow_func(ctx)  # type: ignore[operator]
+
+    typer.echo(f"🐍 Pack Hook: {script_path}")
+    try:
+        run_workflow_func("before_all", make_ctx("before_all"))
+        for step_name in ("build", "pack"):
+            typer.echo("")
+            typer.echo(f"▶️  [{step_name}]")
+            ctx = make_ctx(step_name)
+            run_workflow_func("before_step", ctx)
+            workflow_step = workflow_steps.get(step_name)
+            if workflow_step is None:
+                ctx.builtin()
+            else:
+                workflow_step(ctx)  # type: ignore[operator]
+            run_workflow_func("after_step", ctx)
+            typer.echo(f"✅ [{step_name}] 完成")
+    except Exception:
+        run_workflow_func("after_all", make_ctx("after_all"))
+        run_workflow_func("on_failure", make_ctx("on_failure"))
+        raise
+    else:
+        run_workflow_func("after_all", make_ctx("after_all"))
+        run_workflow_func("on_success", make_ctx("on_success"))
+
+    if output_path is None:
+        raise ValueError("pack workflow 未生成安装包，请在 pack(ctx) 中调用 ctx.builtin()")
+    return output_path
 
 
 def _prepare_changelog(
@@ -903,6 +975,7 @@ def init(
             [
                 shared_dir / "hooks" / "hook-version.py",
                 shared_dir / "hooks" / "hook-release.py",
+                shared_dir / "hooks" / "hook-pack.py",
                 *(release_dir / "_state" / f"{unit}.VERSION" for unit in unit_names),
             ]
         )
@@ -937,6 +1010,13 @@ def init(
             workflow_target.parent.mkdir(parents=True, exist_ok=True)
             workflow_target.write_text(workflow_template.read_text(encoding="utf-8"), encoding="utf-8")
             typer.echo(f"✅ 已生成共享 Release Workflow: {workflow_target}")
+
+        pack_hook_template = template_dir / "hooks" / "hook-pack.py"
+        if pack_hook_template.exists():
+            pack_hook_target = shared_dir / "hooks" / "hook-pack.py"
+            pack_hook_target.parent.mkdir(parents=True, exist_ok=True)
+            pack_hook_target.write_text(pack_hook_template.read_text(encoding="utf-8"), encoding="utf-8")
+            typer.echo(f"✅ 已生成共享 Pack Hook: {pack_hook_target}")
         return
 
     release_dir = Path(".release")
@@ -945,10 +1025,11 @@ def init(
     version_file = release_dir / "_state" / "VERSION"
     hook_file = shared_dir / "hooks" / "hook-version.py"
     workflow_file = shared_dir / "hooks" / "hook-release.py"
+    pack_hook_file = shared_dir / "hooks" / "hook-pack.py"
     github_dir = Path(".github/workflows")
     github_template_dir = template_dir / "github"
 
-    generated_targets = [config_file, version_file, hook_file, workflow_file]
+    generated_targets = [config_file, version_file, hook_file, workflow_file, pack_hook_file]
     if github_template_dir.exists():
         generated_targets.extend(github_dir / template_file.name for template_file in github_template_dir.glob("*.yml"))
 
@@ -985,6 +1066,12 @@ def init(
         workflow_file.parent.mkdir(parents=True, exist_ok=True)
         workflow_file.write_text(workflow_template.read_text(encoding="utf-8"), encoding="utf-8")
         typer.echo(f"✅ 已生成 Release Workflow 模板: {workflow_file}")
+
+    pack_hook_template = template_dir / "hooks" / "hook-pack.py"
+    if pack_hook_template.exists():
+        pack_hook_file.parent.mkdir(parents=True, exist_ok=True)
+        pack_hook_file.write_text(pack_hook_template.read_text(encoding="utf-8"), encoding="utf-8")
+        typer.echo(f"✅ 已生成 Pack Hook 示例: {pack_hook_file}")
 
     github_dir.mkdir(parents=True, exist_ok=True)
     if github_template_dir.exists():
@@ -1323,9 +1410,20 @@ def pack(
 
     try:
         version, changelog_path = _resolve_pack_version(config)
-        packager = Packager(config)
         output_dir = Path(output) if output else None
-        output_path = packager.create_package(version, output_dir)
+        packager = Packager(config)
+        if config.packager_build_enabled:
+            script_path = config.packager_build_script
+            if script_path is None:
+                raise ValueError("packager.build.enabled=true 时必须配置 packager.build.script")
+            output_path = _run_pack_workflow(
+                config,
+                script_path=script_path,
+                version=version,
+                output_dir=output_dir,
+            )
+        else:
+            output_path = packager.create_package(version, output_dir)
 
         typer.echo(f"✅ 已创建安装包: {output_path}")
         typer.echo(f"📝 版本来源: {changelog_path}")

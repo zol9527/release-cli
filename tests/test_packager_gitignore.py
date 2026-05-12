@@ -4,11 +4,16 @@ import subprocess
 import zipfile
 from typing import TYPE_CHECKING
 
+from typer.testing import CliRunner
+
+from release_cli.cli import app
 from release_cli.config import ReleaseConfig
 from release_cli.packager import Packager
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+runner = CliRunner()
 
 
 def _init_git_repo(path: Path) -> None:
@@ -141,3 +146,97 @@ def test_packager_force_include_runs_after_gitignore_and_exclude(tmp_path: Path)
     assert "build/keep.txt" in names
     assert "secret.txt" in names
     assert "build/cache.bin" not in names
+
+
+def test_pack_command_skips_build_hook_when_build_disabled(tmp_path: Path) -> None:
+    """packager.build.enabled=false 时只压缩 workspace，不执行 build hook"""
+    changes_dir = tmp_path / "docs" / "changes"
+    changes_dir.mkdir(parents=True)
+    (changes_dir / "2026-03-11-v1.0.0.md").write_text("---\nversion: \"1.0.0\"\n---\n", encoding="utf-8")
+    (tmp_path / "app.txt").write_text("app\n", encoding="utf-8")
+    hook_file = tmp_path / "hook-pack.py"
+    hook_file.write_text(
+        "def build(ctx):\n"
+        "    (ctx.project_root / 'built.txt').write_text('built', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "changelog:\n"
+        "  output_dir: docs/changes\n"
+        "packager:\n"
+        "  root_dir: .\n"
+        "  output_dir: release\n"
+        "  build:\n"
+        "    enabled: false\n"
+        "    script: hook-pack.py\n"
+        "  include:\n"
+        "    - '*'\n"
+        "  exclude:\n"
+        "    - release\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["--config", str(config_file), "pack"])
+
+    assert result.exit_code == 0
+    assert not (tmp_path / "built.txt").exists()
+
+
+def test_pack_command_runs_build_hook_before_archiving_when_build_enabled(tmp_path: Path) -> None:
+    """packager.build.enabled=true 时先执行 build hook，再压缩构建产物"""
+    changes_dir = tmp_path / "docs" / "changes"
+    changes_dir.mkdir(parents=True)
+    (changes_dir / "2026-03-11-v1.0.0.md").write_text("---\nversion: \"1.0.0\"\n---\n", encoding="utf-8")
+    hook_file = tmp_path / "hook-pack.py"
+    hook_file.write_text(
+        "def build(ctx):\n"
+        "    (ctx.project_root / 'dist').mkdir(exist_ok=True)\n"
+        "    (ctx.project_root / 'dist' / 'app.txt').write_text(ctx.version, encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "changelog:\n"
+        "  output_dir: docs/changes\n"
+        "packager:\n"
+        "  root_dir: .\n"
+        "  output_dir: release\n"
+        "  build:\n"
+        "    enabled: true\n"
+        "    script: hook-pack.py\n"
+        "  include:\n"
+        "    - dist\n"
+        "  exclude:\n"
+        "    - release\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["--config", str(config_file), "pack"])
+
+    assert result.exit_code == 0
+    output_path = tmp_path / "release" / f"{tmp_path.name}-1.0.0.zip"
+    with zipfile.ZipFile(output_path) as archive:
+        assert archive.read("dist/app.txt").decode() == "1.0.0"
+
+
+def test_pack_command_requires_script_when_build_enabled(tmp_path: Path) -> None:
+    """packager.build.enabled=true 但未配置 script 时给出明确错误"""
+    changes_dir = tmp_path / "docs" / "changes"
+    changes_dir.mkdir(parents=True)
+    (changes_dir / "2026-03-11-v1.0.0.md").write_text("---\nversion: \"1.0.0\"\n---\n", encoding="utf-8")
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "changelog:\n"
+        "  output_dir: docs/changes\n"
+        "packager:\n"
+        "  root_dir: .\n"
+        "  build:\n"
+        "    enabled: true\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["--config", str(config_file), "pack"])
+
+    assert result.exit_code != 0
+    assert "packager.build.script" in result.output

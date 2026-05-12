@@ -136,6 +136,13 @@ packager:
   # 开启后可以少写 node_modules、dist、临时日志等重复排除项。
   respect_gitignore: true
 
+  # 是否在压缩前执行构建 Hook。
+  # false: 只压缩 workspace，适合分享源码或单独 workspace。
+  # true: 先执行 _shared/hooks/hook-pack.py，再压缩构建产物。
+  build:
+    enabled: false
+    script: _shared/hooks/hook-pack.py
+
   # 需要打包的候选范围。
   # `*` 在 release-cli 中会匹配根目录下全部入口, 包括隐藏文件和隐藏目录。
   include:
