@@ -98,6 +98,13 @@ release:
   # commit 阶段是否自动暂存版本文件、changelog 和常见业务版本文件。
   auto_stage: true
 
+  # release commit 标题模板。
+  # 可用变量:
+  #   {version}    -> 纯版本号，例如 0.2.2
+  #   {tag}        -> 带 tag_prefix 的标签，例如 v0.2.2 或 backend/v0.2.2
+  #   {tag_prefix} -> Git tag 前缀，例如 v
+  commit_title: "🚀 release: {tag}"
+
   # pr 阶段默认关闭，需要时可在命令传 --create-pr 或改成 true。
   create_pr: false
   push: false

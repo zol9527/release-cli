@@ -175,6 +175,7 @@ release:
     - pr
   allowed_branches: []
   auto_stage: true
+  commit_title: "🚀 release: {{tag}}"
   create_pr: false
   push: false
   base_branch: release
@@ -295,10 +296,21 @@ def _build_released_at(changelog_date: str) -> str:
     return released_at.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def _build_release_commit_message(version: str) -> str:
+def _build_release_commit_message(config: ReleaseConfig, version: str) -> str:
     """构造发布提交信息"""
     normalized_version = version.removeprefix("v")
-    return f"🔧 chore(release): 准备 v{normalized_version} 发布文件"
+    tag = _build_release_tag(config, normalized_version)
+    try:
+        message = config.release_commit_title.format(
+            version=normalized_version,
+            tag=tag,
+            tag_prefix=config.version_tag_prefix,
+        )
+        return message.strip() or "🚀 release: {tag}".format(tag=tag)
+    except KeyError as error:
+        raise ValueError(f"release.commit_title 使用了不支持的变量: {{{error.args[0]}}}") from error
+    except ValueError as error:
+        raise ValueError(f"release.commit_title 模板格式无效: {error}") from error
 
 
 def _build_release_tag(config: ReleaseConfig, version: str) -> str:
@@ -528,7 +540,7 @@ def _release_commit_step(config: ReleaseConfig, changelog_path: Path | None, dry
         if relative_path.strip()
     }
     version, checked_changelog_path, resolved_date = _ensure_release_files_ready(config, staged_files, cwd)
-    message = _build_release_commit_message(version)
+    message = _build_release_commit_message(config, version)
     tag_name = _build_release_tag(config, version)
 
     if _git_ref_exists(cwd, f"refs/tags/{tag_name}"):
@@ -1108,7 +1120,7 @@ def commit_cmd(
             if relative_path.strip()
         }
         version, changelog_path, resolved_date = _ensure_release_files_ready(config, staged_files, cwd)
-        message = _build_release_commit_message(version)
+        message = _build_release_commit_message(config, version)
         tag_name = _build_release_tag(config, version)
 
         if _git_ref_exists(cwd, f"refs/tags/{tag_name}"):

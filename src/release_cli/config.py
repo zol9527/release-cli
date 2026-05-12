@@ -65,6 +65,7 @@ class ReleaseConfig:
                 "steps": ["preflight", "prepare", "commit", "pr"],
                 "allowed_branches": [],
                 "auto_stage": True,
+                "commit_title": "🚀 release: {tag}",
                 "create_pr": False,
                 "push": False,
                 "base_branch": "release",
@@ -209,6 +210,12 @@ class ReleaseConfig:
     def release_auto_stage(self) -> bool:
         """commit 阶段是否自动暂存发布相关文件"""
         return bool(self.release_config.get("auto_stage", True))
+
+    @property
+    def release_commit_title(self) -> str:
+        """发布提交标题模板，支持 {version}、{tag} 和 {tag_prefix}"""
+        title = self.release_config.get("commit_title", "🚀 release: {tag}")
+        return str(title).strip() or "🚀 release: {tag}"
 
     @property
     def release_create_pr(self) -> bool:

@@ -150,13 +150,20 @@ release-cli version 1.2.3 --write --note "需要手动迁移旧配置" --note "�
 release-cli commit
 ```
 
-它会读取当前版本，并对当前“已暂存”的内容创建一条固定格式的提交信息：
+它会读取当前版本，并对当前“已暂存”的内容创建一条模板化提交信息。默认模板是：
 
 ```text
-🔧 chore(release): 准备 v0.1.0 发布文件
+🚀 release: v0.1.0
 ```
 
-这里的版本号只会使用 `release-cli version --write` 已经写出的版本文件。所以如果你当前版本是 `1.2.3`，最终提交标题就是 `🔧 chore(release): 准备 v1.2.3 发布文件`。
+这里的版本号只会使用 `release-cli version --write` 已经写出的版本文件。你可以在配置模板里用 `release.commit_title` 自定义：
+
+```yaml
+release:
+  commit_title: "🚀 release: {tag}"
+```
+
+可用变量包括 `{version}`、`{tag}` 和 `{tag_prefix}`。如果你当前版本是 `1.2.3`，默认提交标题就是 `🚀 release: v1.2.3`。
 
 提交成功后，它还会自动创建对应的 Git Tag，例如 `v1.2.3`。
 

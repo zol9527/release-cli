@@ -118,6 +118,7 @@ def test_init_monorepo_generates_unit_configs_and_shared_workflow(tmp_path: Path
     assert (tmp_path / ".release" / "_state" / "backend.VERSION").exists()
     assert (tmp_path / ".release" / "_state" / "wechat.VERSION").exists()
     assert 'tag_prefix: "backend/v"' in (tmp_path / ".release" / "backend.yml").read_text(encoding="utf-8")
+    assert 'commit_title: "🚀 release: {tag}"' in (tmp_path / ".release" / "backend.yml").read_text(encoding="utf-8")
     assert "release_cli.workflow" not in (tmp_path / ".release" / "_shared" / "hooks" / "hook-release.py").read_text(encoding="utf-8")
 
 
@@ -134,6 +135,7 @@ def test_init_single_project_generates_everything_under_release_dir(tmp_path: Pa
     assert not (tmp_path / ".release.yml").exists()
     assert not (tmp_path / "VERSION").exists()
     assert not (tmp_path / "scripts" / "release-version-hook.py").exists()
+    assert 'commit_title: "🚀 release: {tag}"' in (tmp_path / ".release" / "release.yml").read_text(encoding="utf-8")
 
 
 def test_release_flow_can_load_plain_named_step_functions(tmp_path: Path) -> None:

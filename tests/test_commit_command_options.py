@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from release_cli.cli import _build_release_tag, _ensure_release_files_ready, app
+from release_cli.cli import _build_release_commit_message, _build_release_tag, _ensure_release_files_ready, app
 from release_cli.config import ReleaseConfig
 
 runner = CliRunner()
@@ -72,3 +72,45 @@ def test_build_release_tag_uses_configured_tag_prefix(tmp_path: Path) -> None:
     )
 
     assert _build_release_tag(ReleaseConfig(config_file), "1.2.3") == "backend/v1.2.3"
+
+
+def test_build_release_commit_message_uses_default_template(tmp_path: Path) -> None:
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "version:\n"
+        "  tag_prefix: v\n"
+        "packager:\n"
+        "  root_dir: .\n",
+        encoding="utf-8",
+    )
+
+    assert _build_release_commit_message(ReleaseConfig(config_file), "0.2.2") == "🚀 release: v0.2.2"
+
+
+def test_build_release_commit_message_uses_configured_template(tmp_path: Path) -> None:
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "version:\n"
+        "  tag_prefix: backend/v\n"
+        "release:\n"
+        "  commit_title: \"🚀 release({tag_prefix}): {version}\"\n"
+        "packager:\n"
+        "  root_dir: .\n",
+        encoding="utf-8",
+    )
+
+    assert _build_release_commit_message(ReleaseConfig(config_file), "1.2.3") == "🚀 release(backend/v): 1.2.3"
+
+
+def test_build_release_commit_message_rejects_unknown_template_variable(tmp_path: Path) -> None:
+    config_file = tmp_path / ".release.yml"
+    config_file.write_text(
+        "release:\n"
+        "  commit_title: \"release {name}\"\n"
+        "packager:\n"
+        "  root_dir: .\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match=r"\{name\}"):
+        _build_release_commit_message(ReleaseConfig(config_file), "1.2.3")

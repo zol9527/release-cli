@@ -94,6 +94,7 @@ release:
     - "^dev$"
     - "^hotfix/.+$"
   auto_stage: true
+  commit_title: "🚀 release: {tag}"
   create_pr: false
   push: false
   base_branch: release
@@ -163,7 +164,9 @@ python .release/_shared/hooks/hook-version.py /tmp/release-hook-payload.json
 
 `release-cli version --write` 现在会一次性完成两件事：生成版本文件，以及生成对应的 changelog 文件；但它仍然不负责创建 Git Tag。
 
-`release-cli commit` 只会读取 `release-cli version --write` 已经写出的版本文件和 changelog，校验两者都已生成且已纳入本次提交，然后对“已暂存内容”生成一次标准化提交，标题为 `🔧 chore(release): 准备 vx.x.x 发布文件`，最后再创建对应的 Git Tag。如果你确实要把当前工作区全部变更一起提交，再显式使用 `release-cli commit --all`。
+`release-cli commit` 只会读取 `release-cli version --write` 已经写出的版本文件和 changelog，校验两者都已生成且已纳入本次提交，然后对“已暂存内容”生成一次标准化提交，标题默认来自 `release.commit_title: "🚀 release: {tag}"`，最后再创建对应的 Git Tag。如果你确实要把当前工作区全部变更一起提交，再显式使用 `release-cli commit --all`。
+
+`release.commit_title` 支持 `{version}`、`{tag}` 和 `{tag_prefix}` 三个变量。其中 `{version}` 是纯版本号，例如 `0.2.2`；`{tag}` 会带上 `version.tag_prefix`，默认就是 `v0.2.2`。
 
 `release-cli commit` 默认还会检查三件事：
 1. `VERSION` 文件必须能够唯一确定当前发布版本，且要和 changelog frontmatter 中的 `version` 一致
