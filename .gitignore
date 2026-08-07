@@ -84,4 +84,4 @@ test-results/
 
 # prisma
 generated/
-
+.serena/
