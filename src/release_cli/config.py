@@ -74,7 +74,9 @@ class ReleaseConfig:
                 "name": "{name}-{version}",
                 "root_dir": ".",
                 "output_dir": "release",
-                "respect_gitignore": False,
+                # 默认开启 gitignore 过滤，与 `release-cli init` 生成的模板保持一致。
+                # 老配置若未显式声明该字段，行为会从 False 变为 True（更安全：少打 node_modules/dist/.venv）。
+                "respect_gitignore": True,
                 "build": {
                     "enabled": False,
                     "script": None,
@@ -272,7 +274,7 @@ class ReleaseConfig:
     @property
     def packager_respect_gitignore(self) -> bool:
         """打包时是否额外遵循 Git ignore 规则"""
-        return bool(self._config.get("packager", {}).get("respect_gitignore", False))
+        return bool(self._config.get("packager", {}).get("respect_gitignore", True))
 
     @property
     def packager_build_enabled(self) -> bool:

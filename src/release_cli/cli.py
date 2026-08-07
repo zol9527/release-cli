@@ -484,6 +484,8 @@ def _write_release_version(
     )
     changelog_existed = changelog_path.exists()
     previous_changelog = changelog_path.read_text(encoding="utf-8") if changelog_existed else None
+    if changelog_existed:
+        typer.echo(f"⚠️ Changelog 文件已存在，将覆盖: {changelog_path}")
     changelog_path.write_text(changelog_markdown, encoding="utf-8")
 
     try:
@@ -1141,6 +1143,8 @@ def version(
             )
             changelog_existed = changelog_path.exists()
             previous_changelog = changelog_path.read_text(encoding="utf-8") if changelog_existed else None
+            if changelog_existed:
+                typer.echo(f"⚠️ Changelog 文件已存在，将覆盖: {changelog_path}")
             changelog_path.write_text(changelog_markdown, encoding="utf-8")
 
             try:

@@ -94,6 +94,7 @@ def test_packager_keeps_ignored_files_when_gitignore_option_is_disabled(tmp_path
         "packager:\n"
         "  root_dir: .\n"
         "  output_dir: release\n"
+        "  respect_gitignore: false\n"
         "  include:\n"
         "    - '*'\n"
         "  exclude:\n"
